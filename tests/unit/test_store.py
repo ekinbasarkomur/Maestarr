@@ -13,7 +13,7 @@ async def test_conversation_roundtrip(tmp_path):
     loaded = await store.messages(cid)
     assert [type(m).__name__ for m in loaded] == ["ModelRequest", "ModelResponse"]
     assert loaded[1].parts[0].content == "hello"
-    assert [c["title"] for c in await store.list(channel=None)] == ["first"]
+    assert [c["title"] for c in await store.list_all(channel=None)] == ["first"]
     await store.set_pending(cid, {"calls": ["a"], "decisions": {}})
     assert (await store.pending(cid))["calls"] == ["a"]
     await store.delete(cid)

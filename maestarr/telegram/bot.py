@@ -193,7 +193,7 @@ def build_dispatcher(channel: TelegramChannel) -> Dispatcher:
         _, call_id, flag = (query.data or "").rsplit(":", 2) if (query.data or "").count(":") >= 2 else ("", "", "")
         approved = flag == "1"
         await query.answer("Approved" if approved else "Denied")
-        if query.message:
+        if isinstance(query.message, Message):
             with contextlib.suppress(Exception):
                 await query.message.edit_reply_markup(reply_markup=None)
                 await query.message.answer("✅ Approved" if approved else "✖️ Denied")

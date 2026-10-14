@@ -82,7 +82,7 @@ class Store:
             await db.close()
         return dict(row) if row else None
 
-    async def list(self, channel: Optional[str] = "web", limit: int = 50) -> list[dict[str, Any]]:
+    async def list_all(self, channel: Optional[str] = "web", limit: int = 50) -> list[dict[str, Any]]:
         db = await self._db()
         try:
             query = "SELECT id, channel, title, created_at, updated_at FROM conversations"

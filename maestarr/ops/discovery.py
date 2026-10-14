@@ -54,7 +54,7 @@ async def watch_history(svc: Services, limit: int = 400) -> list[WatchEvent]:
     if svc.anilist and svc.settings.ANILIST_USERNAME:
         tasks.append(svc.anilist.user_history(svc.settings.ANILIST_USERNAME))
     for result in await asyncio.gather(*tasks, return_exceptions=True):
-        if isinstance(result, Exception):
+        if isinstance(result, BaseException):
             logger.warning("history source failed: %s", result)
         else:
             sources.append(result)
@@ -191,9 +191,9 @@ async def recommendations(
     cache = _cache(svc)
     watched: set[tuple[str, int]] = set()
     resolved = await asyncio.gather(*(cache.resolve(e) for e in history[:300]))
-    for r in resolved:
-        if r:
-            watched.add(r)
+    for pair in resolved:
+        if pair:
+            watched.add(pair)
     req = RecommendRequest(
         kind=kind, mood=mood, mood_keywords=mood_keywords or [], genres=genres or [],
         year_from=year_from, year_to=year_to, language=language, max_runtime=max_runtime,

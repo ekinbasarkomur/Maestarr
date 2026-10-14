@@ -200,7 +200,7 @@ async def run_test(service: str, s: Settings) -> dict[str, Any]:
         key = secret(getattr(s, f"{service.upper()}_API_KEY"))
         need(url, key)
         cls = {"sonarr": SonarrClient, "radarr": RadarrClient, "whisparr": WhisparrClient}[service]
-        client = cls(url, key or "")
+        client: Any = cls(url, key or "")
         try:
             return await _arr_test(client, service)
         finally:

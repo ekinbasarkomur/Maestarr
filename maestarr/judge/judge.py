@@ -184,7 +184,7 @@ def evidence_for_llm(assessments: list[ReleaseAssessment], prefs: Preferences, r
 async def llm_verdict(model: object, assessments: list[ReleaseAssessment], prefs: Preferences, request: JudgeRequest) -> JudgeVerdict:
     from pydantic_ai import Agent
 
-    agent: Agent[None, JudgeVerdict] = Agent(model, output_type=JudgeVerdict, instructions=JUDGE_INSTRUCTIONS)  # type: ignore[arg-type]
+    agent: Agent[None, JudgeVerdict] = Agent(model, output_type=JudgeVerdict, instructions=JUDGE_INSTRUCTIONS)  # type: ignore[call-overload]
     result = await agent.run(evidence_for_llm(assessments, prefs, request))
     verdict = result.output
     known = {a.candidate.guid: a for a in assessments}

@@ -70,16 +70,16 @@ class Services:
 
         return cls(
             settings=s,
-            sonarr=SonarrClient(s.SONARR_URL, secret(s.SONARR_API_KEY) or "")
+            sonarr=SonarrClient(s.SONARR_URL or "", secret(s.SONARR_API_KEY) or "")
             if both(s.SONARR_URL, s.SONARR_API_KEY)
             else None,
-            radarr=RadarrClient(s.RADARR_URL, secret(s.RADARR_API_KEY) or "")
+            radarr=RadarrClient(s.RADARR_URL or "", secret(s.RADARR_API_KEY) or "")
             if both(s.RADARR_URL, s.RADARR_API_KEY)
             else None,
-            whisparr=WhisparrClient(s.WHISPARR_URL, secret(s.WHISPARR_API_KEY) or "")
+            whisparr=WhisparrClient(s.WHISPARR_URL or "", secret(s.WHISPARR_API_KEY) or "")
             if both(s.WHISPARR_URL, s.WHISPARR_API_KEY)
             else None,
-            prowlarr=ProwlarrClient(s.PROWLARR_URL, secret(s.PROWLARR_API_KEY) or "")
+            prowlarr=ProwlarrClient(s.PROWLARR_URL or "", secret(s.PROWLARR_API_KEY) or "")
             if both(s.PROWLARR_URL, s.PROWLARR_API_KEY)
             else None,
             qbittorrent=QBittorrentClient(
@@ -90,7 +90,7 @@ class Services:
             )
             if s.QBITTORRENT_URL
             else None,
-            jellyfin=JellyfinClient(s.JELLYFIN_URL, secret(s.JELLYFIN_API_KEY) or "", s.JELLYFIN_USER)
+            jellyfin=JellyfinClient(s.JELLYFIN_URL or "", secret(s.JELLYFIN_API_KEY) or "", s.JELLYFIN_USER)
             if both(s.JELLYFIN_URL, s.JELLYFIN_API_KEY)
             else None,
             tmdb=TmdbClient(secret(s.TMDB_API_KEY) or "") if secret(s.TMDB_API_KEY) else None,

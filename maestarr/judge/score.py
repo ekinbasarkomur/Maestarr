@@ -56,9 +56,9 @@ def score_assessment(
             score -= 15
             reasons.append(f"{res}p is below the preferred {prefs.min_resolution}p (-15)")
         else:
-            bonus = {2160: 10, 1080: 8, 720: 3}.get(res, 0)
-            score += bonus
-            reasons.append(f"{res}p (+{bonus})")
+            res_bonus = {2160: 10, 1080: 8, 720: 3}.get(res, 0)
+            score += res_bonus
+            reasons.append(f"{res}p (+{res_bonus})")
     if c.quality and "remux" in c.quality.lower() and not prefs.allow_remux:
         score -= 20
         reasons.append("remux while remuxes are not wanted (-20)")
@@ -82,9 +82,9 @@ def score_assessment(
             score -= 12
             reasons.append(f"only {seeders} {label} seeders (-12)")
         else:
-            bonus = min(25.0, math.log2(1 + seeders) * 4)
-            score += bonus
-            reasons.append(f"{seeders} {label} seeders (+{bonus:.0f})")
+            seed_bonus = min(25.0, math.log2(1 + seeders) * 4)
+            score += seed_bonus
+            reasons.append(f"{seeders} {label} seeders (+{seed_bonus:.0f})")
         if swarm.method == "scrape" and c.seeders and c.seeders > 3 * max(seeders, 1):
             reasons.append(f"indexer claimed {c.seeders} seeders, trackers report {seeders}")
 
@@ -102,10 +102,10 @@ def score_assessment(
             reasons.append("pack also holds another show: " + ", ".join(r.foreign_titles) + " — select files")
         if r.wanted_episodes_total:
             ratio = (r.wanted_episodes_covered or 0) / r.wanted_episodes_total
-            bonus = 25 * ratio
-            score += bonus
+            cover_bonus = 25 * ratio
+            score += cover_bonus
             reasons.append(
-                f"covers {r.wanted_episodes_covered}/{r.wanted_episodes_total} wanted episodes (+{bonus:.0f})"
+                f"covers {r.wanted_episodes_covered}/{r.wanted_episodes_total} wanted episodes (+{cover_bonus:.0f})"
             )
             if ratio == 0:
                 blockers.append("none of the wanted episodes are inside")

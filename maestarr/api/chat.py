@@ -72,7 +72,7 @@ async def chat(request: Request, _: Any = Depends(require_user)) -> Response:
 
 @router.get("/conversations")
 async def list_conversations(_: Any = Depends(require_user)) -> list[dict[str, Any]]:
-    return await get_store().list(channel=None)
+    return await get_store().list_all(channel=None)
 
 
 @router.get("/conversations/{cid}")
