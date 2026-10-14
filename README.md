@@ -68,6 +68,8 @@ without your approval.
 
 ## Screenshots
 
+<p align="center"><img src="docs/screenshots/chat.png" width="720" alt="Recommendations as cards in the chat, each with a Search button" /></p>
+
 | Onboarding | Service setup |
 | --- | --- |
 | ![Choosing an AI provider during setup](docs/screenshots/setup-ai.png) | ![Testing Sonarr and picking defaults](docs/screenshots/setup-services.png) |

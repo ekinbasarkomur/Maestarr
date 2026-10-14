@@ -29,6 +29,9 @@ from maestarr.torrent.resolve import ReleaseResolver
 logger = logging.getLogger(__name__)
 
 
+STATUS_TIMEOUT = 10.0
+
+
 class NotConfigured(ServiceError):
     def __init__(self, service: str, hint: str):
         super().__init__(service, f"not configured — set {hint}")
@@ -200,8 +203,11 @@ class Services:
                     return ServiceStatus(name=name, configured=False, detail="18+ off")
                 return ServiceStatus(name=name, configured=False)
             try:
-                version = await probe()
+                # A status page must answer quickly even when a service is crawling.
+                version = await asyncio.wait_for(probe(), timeout=STATUS_TIMEOUT)
                 return ServiceStatus(name=name, configured=True, ok=True, version=version)
+            except asyncio.TimeoutError:
+                return ServiceStatus(name=name, configured=True, ok=False, detail=f"no answer in {STATUS_TIMEOUT:.0f} s")
             except Exception as exc:  # noqa: BLE001 — report, never raise
                 return ServiceStatus(name=name, configured=True, ok=False, detail=str(exc)[:200])
 
