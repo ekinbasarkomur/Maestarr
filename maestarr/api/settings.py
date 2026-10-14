@@ -35,6 +35,7 @@ SECTIONS: dict[str, list[str]] = {
     "prowlarr": ["PROWLARR_URL", "PROWLARR_API_KEY"],
     "qbittorrent": ["QBITTORRENT_URL", "QBITTORRENT_USERNAME", "QBITTORRENT_PASSWORD", "QBITTORRENT_HOST_HEADER"],
     "tmdb": ["TMDB_API_KEY"],
+    "seerr": ["SEERR_URL", "SEERR_API_KEY"],
     "omdb": ["OMDB_API_KEY"],
     "trakt": ["TRAKT_CLIENT_ID", "TRAKT_USERNAME"],
     "anilist": ["ANILIST_USERNAME"],
@@ -301,6 +302,17 @@ async def run_test(service: str, s: Settings) -> dict[str, Any]:
         try:
             genres = await client.genres("movie")
             return {"version": "v3", "genres": len(genres)}
+        finally:
+            await client.aclose()
+    if service == "seerr":
+        from maestarr.clients.seerr import SeerrMetadataClient
+
+        need(s.SEERR_URL and secret(s.SEERR_API_KEY))
+        client = SeerrMetadataClient(s.SEERR_URL or "", secret(s.SEERR_API_KEY) or "")
+        try:
+            status = await client.get_json("/status")
+            genres = await client.genres("movie")  # needs a valid API key
+            return {"version": status.get("version"), "genres": len(genres)}
         finally:
             await client.aclose()
     if service == "omdb":

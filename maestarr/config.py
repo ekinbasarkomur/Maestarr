@@ -108,6 +108,10 @@ class Settings(BaseSettings):
 
     # --- Metadata sources ---
     TMDB_API_KEY: Optional[SecretStr] = None
+    # Seerr (Overseerr/Jellyseerr) answers TMDB's questions with its own built-in key,
+    # so Maestarr needs no TMDB account when Seerr is connected.
+    SEERR_URL: Optional[str] = None
+    SEERR_API_KEY: Optional[SecretStr] = None
     OMDB_API_KEY: Optional[SecretStr] = None
     TRAKT_CLIENT_ID: Optional[SecretStr] = None
     TRAKT_USERNAME: Optional[str] = None

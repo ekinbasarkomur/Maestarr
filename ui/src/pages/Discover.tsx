@@ -153,11 +153,11 @@ export default function DiscoverPage() {
         {!adult && error && (
           <div className="glass rounded-2xl p-6 text-sm text-muted-foreground">
             <p className="font-medium text-foreground">
-              {error.includes('tmdb') ? 'Picks need a TMDB key.' : 'No picks yet.'}
+              {error.includes('tmdb') ? 'Picks need a metadata source.' : 'No picks yet.'}
             </p>
             <p className="mt-1">
               {error.includes('tmdb')
-                ? 'TMDB is free (themoviedb.org → Settings → API). Your watch history comes from Jellyfin, Trakt or AniList, or from your library until you have one.'
+                ? 'Connect Seerr (no extra account needed) or add a free TMDB key. Your watch history comes from Jellyfin, Trakt or AniList, or from your library until you have one.'
                 : error}{' '}
               <button
                 className="text-primary underline"

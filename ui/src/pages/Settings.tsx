@@ -116,7 +116,7 @@ export default function SettingsPage() {
                     />
                   ))}
                 {tab === 'discovery' &&
-                  ['tmdb', 'omdb', 'trakt', 'anilist', 'stashdb'].map((id) => (
+                  ['seerr', 'tmdb', 'omdb', 'trakt', 'anilist', 'stashdb'].map((id) => (
                     <ServiceCard
                       key={id}
                       def={SERVICES[id]}

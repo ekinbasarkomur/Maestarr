@@ -74,7 +74,7 @@ class TmdbClient(HttpService):
         return await self.get_json(
             f"/{kind}/{tmdb_id}",
             language=self.language,
-            append_to_response="keywords,credits,external_ids,recommendations,similar",
+            append_to_response="keywords,credits,external_ids,recommendations,similar,videos",
         )
 
     async def discover(self, kind: TmdbKind, **filters: Any) -> list[dict[str, Any]]:

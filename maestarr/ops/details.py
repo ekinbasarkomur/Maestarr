@@ -151,14 +151,12 @@ async def _series(
 
 
 async def _add_tmdb(svc: Services, out: dict[str, Any]) -> None:
-    """Cast, keywords, a backdrop and a trailer from TMDB, when a key is set."""
+    """Cast, keywords, a backdrop and a trailer from TMDB (or Seerr standing in for it)."""
     if not svc.tmdb or not out.get("tmdb_id"):
         return
     kind = "movie" if out["kind"] == "movie" else "tv"
     try:
-        det = await svc.tmdb.get_json(
-            f"/{kind}/{out['tmdb_id']}", language=svc.tmdb.language, append_to_response="credits,videos,keywords"
-        )
+        det = await svc.tmdb.details(kind, int(out["tmdb_id"]))  # type: ignore[arg-type]
     except ServiceError as exc:
         logger.warning("tmdb details failed: %s", exc)
         return

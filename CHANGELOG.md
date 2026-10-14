@@ -7,6 +7,14 @@ change behaviour.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-15
+
+### Added
+- Seerr (Overseerr / Jellyseerr) as a metadata source: search, Discover,
+  recommendations and details work without a TMDB account, through Seerr's own
+  TMDB access. A TMDB key, when set, is still used first.
+- TMDB attribution in the README.
+
 ## [0.2.0] - 2026-10-15
 
 The first public release.
@@ -45,5 +53,6 @@ The first public release.
 - Long release searches are allowed up to 30 minutes, with a clear message.
 - A chat that contained a "thinking" reply no longer fails on the next message.
 
-[Unreleased]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/ekinbasarkomur/Maestarr/releases/tag/v0.2.0

@@ -51,8 +51,8 @@ without your approval.
 - **Pack surgery** — download only the files you need from a big pack and
   import them into the right series.
 - **Recommendations from your history** (Jellyfin, Trakt, AniList, Letterboxd)
-  with moods — *melancholic*, *cozy*, *mind-bending* — TMDB metadata and IMDb
-  ratings. Titles you already own are flagged as an easy “watch tonight”. With no
+  with moods — *melancholic*, *cozy*, *mind-bending* — TMDB metadata (through your
+  Seerr, or your own TMDB key) and IMDb ratings. Titles you already own are flagged as an easy “watch tonight”. With no
   history yet, your Sonarr/Radarr library stands in for it.
 - **Picks as cards** — when the assistant recommends something, the chat shows
   a swipeable row of cards: the poster Sonarr/Radarr use, a description, the
@@ -102,7 +102,8 @@ without your approval.
 | [qBittorrent](https://www.qbittorrent.org) 4.6+ / 5.x | torrent contents, file selection, live swarm | recommended |
 | [Prowlarr](https://prowlarr.com) | free-text searches for complete-series packs | optional |
 | [Jellyfin](https://jellyfin.org) 10.10+ / 12 | watch history for recommendations | recommended |
-| [TMDB](https://www.themoviedb.org) | titles, themes and posters | recommended |
+| [Seerr](https://docs.seerr.dev) (Overseerr / Jellyseerr) | titles, themes and posters through Seerr's own TMDB access — no TMDB account needed | recommended |
+| [TMDB](https://www.themoviedb.org) | the same, with your own key (used instead of Seerr when set) | optional |
 | [OMDb](https://www.omdbapi.com) | IMDb ratings | optional |
 | [Trakt](https://trakt.tv), [AniList](https://anilist.co), Letterboxd export | more history | optional |
 | [Whisparr](https://whisparr.com) v3, [StashDB](https://stashdb.org) | adult content — only while the 18+ switch is on | optional |
@@ -250,6 +251,12 @@ Bug reports, ideas and pull requests are welcome — see
 
 Maestarr's sister project, [Orchestarr](https://github.com/ekinbasarkomur/Orchestarr),
 will install and wire a whole media stack from Maestarr's onboarding.
+
+## Credits
+
+This product uses the TMDB API but is not endorsed or certified by
+[TMDB](https://www.themoviedb.org). Scene metadata comes from
+[StashDB](https://stashdb.org); IMDb ratings from [OMDb](https://www.omdbapi.com).
 
 ## License
 

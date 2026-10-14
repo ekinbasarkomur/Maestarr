@@ -295,7 +295,7 @@ function StepBody({
   if (step === 'discovery') {
     return (
       <div className="space-y-3">
-        {['tmdb', 'omdb', 'trakt', 'anilist', 'stashdb'].map((id, i) => (
+        {['seerr', 'tmdb', 'omdb', 'trakt', 'anilist', 'stashdb'].map((id, i) => (
           <ServiceCard
             key={id}
             def={SERVICES[id]}

@@ -33,6 +33,17 @@ logger = logging.getLogger(__name__)
 STATUS_TIMEOUT = 10.0
 
 
+def metadata_client(s: Settings) -> Optional[TmdbClient]:
+    """TMDB itself when a key is set, otherwise Seerr standing in for it."""
+    if secret(s.TMDB_API_KEY):
+        return TmdbClient(secret(s.TMDB_API_KEY) or "")
+    if s.SEERR_URL and secret(s.SEERR_API_KEY):
+        from maestarr.clients.seerr import SeerrMetadataClient
+
+        return SeerrMetadataClient(s.SEERR_URL, secret(s.SEERR_API_KEY) or "")
+    return None
+
+
 class NotConfigured(ServiceError):
     def __init__(self, service: str, hint: str):
         super().__init__(service, f"not configured — set {hint}")
@@ -99,7 +110,7 @@ class Services:
             jellyfin=JellyfinClient(s.JELLYFIN_URL or "", secret(s.JELLYFIN_API_KEY) or "", s.JELLYFIN_USER)
             if both(s.JELLYFIN_URL, s.JELLYFIN_API_KEY)
             else None,
-            tmdb=TmdbClient(secret(s.TMDB_API_KEY) or "") if secret(s.TMDB_API_KEY) else None,
+            tmdb=metadata_client(s),
             omdb=OmdbClient(secret(s.OMDB_API_KEY) or "") if secret(s.OMDB_API_KEY) else None,
             anilist=AniListClient(s.data_dir),
             trakt=TraktClient(secret(s.TRAKT_CLIENT_ID) or "") if secret(s.TRAKT_CLIENT_ID) else None,
@@ -138,7 +149,9 @@ class Services:
 
     def need_tmdb(self) -> TmdbClient:
         if not self.tmdb:
-            raise NotConfigured("tmdb", "TMDB_API_KEY")
+            raise ServiceError(
+                "tmdb", "no metadata source — connect Seerr or add a TMDB key under Settings → Discovery"
+            )
         return self.tmdb
 
     def need_prowlarr(self) -> ProwlarrClient:
@@ -245,7 +258,7 @@ async def _jf_version(client: Any) -> str:
 
 async def _tmdb_ok(client: Any) -> str:
     await client.genres("movie")
-    return "v3"
+    return "via Seerr" if client.name == "seerr" else "ok"
 
 
 async def _omdb_ok(client: Any) -> str:

@@ -170,13 +170,22 @@ export const SERVICES: Record<string, ServiceDef> = {
       },
     ],
   },
+  seerr: {
+    id: 'seerr',
+    title: 'Seerr',
+    tagline:
+      'Metadata without a TMDB account: Seerr (Overseerr/Jellyseerr) answers search, discover and details with its own key.',
+    keyHint: 'Seerr → Settings → General → API Key.',
+    fields: [url('SEERR_URL', 'http://seerr:5055'), key('SEERR_API_KEY')],
+    recommended: true,
+  },
   tmdb: {
     id: 'tmdb',
     title: 'TMDB',
-    tagline: 'Titles, themes and posters for search and recommendations.',
+    tagline:
+      'Titles, themes and posters for search and recommendations. Not needed if Seerr is connected.',
     keyHint: 'themoviedb.org → Settings → API — the v3 key or the read access token both work.',
     fields: [key('TMDB_API_KEY')],
-    recommended: true,
   },
   omdb: {
     id: 'omdb',

@@ -205,8 +205,8 @@ export default function HomePage() {
           )}
           {picksError && (
             <p className="py-6 text-sm text-muted-foreground">
-              Recommendations need TMDB and a watch history (Jellyfin, Trakt or AniList) — add them
-              in{' '}
+              Recommendations need Seerr or a TMDB key, plus some history (Jellyfin, Trakt, AniList
+              or just your library) — set them up in{' '}
               <button
                 className="text-primary underline"
                 onClick={() => navigate('/settings/discovery')}
