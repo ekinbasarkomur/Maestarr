@@ -81,6 +81,10 @@ without your approval.
 
 <p align="center"><img src="docs/screenshots/chat.png" width="720" alt="Recommendations as cards in the chat, each with a Search button" /></p>
 
+| Details | Release judge |
+| --- | --- |
+| ![A title's details: backdrop, trailer, ratings, tags](docs/screenshots/details.png) | ![Judged releases as a pick list with Download buttons](docs/screenshots/release-picker.png) |
+
 | Onboarding | Service setup |
 | --- | --- |
 | ![Choosing an AI provider during setup](docs/screenshots/setup-ai.png) | ![Testing Sonarr and picking defaults](docs/screenshots/setup-services.png) |
