@@ -470,3 +470,74 @@ async def whisparr_add(
     }
     created = await whisparr.add_movie(payload)
     return {"movie_id": created["id"], "title": created.get("title"), "app": "whisparr", "searching": search_now}
+
+
+async def item_title(svc: Services, app: str, item_id: int) -> str:
+    """'Title (year)' of a library item, for approval cards."""
+    try:
+        if app == "sonarr":
+            item = await svc.need_sonarr().series_by_id(item_id)
+        else:
+            item = await svc.need_movie_app(app).movie_by_id(item_id)
+    except ServiceError:
+        return f"{app} item {item_id}"
+    return f"{item.get('title')}" + (f" ({item['year']})" if item.get("year") else "")
+
+
+async def set_monitored(
+    svc: Services,
+    *,
+    app: str,
+    item_id: int,
+    monitored: bool,
+    season: Optional[int] = None,
+    episodes: Optional[list[int]] = None,
+) -> dict[str, Any]:
+    """Turn monitoring on or off without touching any file.
+
+    Movies/scenes as a whole; series as a whole, one season, or episodes of a season.
+    """
+    if app in ("radarr", "whisparr"):
+        movies = svc.need_movie_app(app)
+        await movies.put_json("/api/v3/movie/editor", {"movieIds": [item_id], "monitored": monitored})
+        return {"app": app, "movie_id": item_id, "monitored": monitored, "title": await item_title(svc, app, item_id)}
+    sonarr = svc.need_sonarr()
+    if episodes:
+        if season is None:
+            raise ServiceError("maestarr", "give the season for these episodes")
+        eps = await sonarr.episodes(item_id)
+        ids = [e["id"] for e in eps if e["seasonNumber"] == season and e["episodeNumber"] in episodes]
+        if not ids:
+            raise ServiceError("sonarr", f"none of those episodes exist in season {season}")
+        await sonarr.set_episodes_monitored(ids, monitored)
+        return {"app": "sonarr", "series_id": item_id, "season": season, "episodes": episodes, "monitored": monitored}
+    if season is not None:
+        series = await sonarr.series_by_id(item_id)
+        found = False
+        for s in series.get("seasons") or []:
+            if s.get("seasonNumber") == season:
+                s["monitored"] = monitored
+                found = True
+        if not found:
+            raise ServiceError("sonarr", f"season {season} not found")
+        await sonarr.put_json(f"/api/v3/series/{item_id}", series)
+        return {"app": "sonarr", "series_id": item_id, "season": season, "monitored": monitored, "title": series.get("title")}
+    await sonarr.put_json("/api/v3/series/editor", {"seriesIds": [item_id], "monitored": monitored})
+    return {"app": "sonarr", "series_id": item_id, "monitored": monitored, "title": await item_title(svc, "sonarr", item_id)}
+
+
+async def remove_from_library(
+    svc: Services, *, app: str, item_id: int, delete_files: bool = False, exclude: bool = False
+) -> dict[str, Any]:
+    """Remove a series, movie or scene from its app. Files stay unless asked;
+    `exclude` keeps import lists from adding it back."""
+    title = await item_title(svc, app, item_id)
+    if app == "sonarr":
+        await svc.need_sonarr().delete(
+            f"/api/v3/series/{item_id}", deleteFiles=str(delete_files).lower(), addImportListExclusion=str(exclude).lower()
+        )
+    else:
+        await svc.need_movie_app(app).delete(
+            f"/api/v3/movie/{item_id}", deleteFiles=str(delete_files).lower(), addImportExclusion=str(exclude).lower()
+        )
+    return {"removed": True, "app": app, "title": title, "files_deleted": delete_files, "excluded": exclude}

@@ -7,6 +7,15 @@ change behaviour.
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-10-15
+
+### Added
+- The assistant can turn monitoring on or off without deleting anything — for a
+  series, one season, some episodes, a movie or a Whisparr scene — and remove an
+  item from its app (files kept unless you ask, optional import exclusion). Both
+  ask for approval first.
+
+
 ## [0.4.2] - 2026-10-15
 
 ### Fixed
@@ -98,7 +107,8 @@ The first public release.
 - Long release searches are allowed up to 30 minutes, with a clear message.
 - A chat that contained a "thinking" reply no longer fails on the next message.
 
-[Unreleased]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.4.3...HEAD
+[0.4.3]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.3.0...v0.4.0

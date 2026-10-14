@@ -21,6 +21,8 @@ export const TOOL_LABELS: Record<string, [running: string, done: string]> = {
   start_automatic_search: ['Starting a search', 'Search started'],
   delete_episode_files: ['Deleting episode files', 'Deleted episode files'],
   delete_movie_file: ['Deleting the movie file', 'Deleted the movie file'],
+  set_monitoring: ['Changing monitoring', 'Monitoring changed'],
+  remove_from_library: ['Removing from the library', 'Removed from the library'],
   list_torrents: ['Reading the torrent list', 'Read the torrent list'],
   torrent_files: ['Reading torrent files', 'Read torrent files'],
   remove_torrents: ['Removing torrents', 'Removed torrents'],

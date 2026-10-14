@@ -419,6 +419,55 @@ async def delete_movie_file(
     return await library.delete_movie_file(ctx.deps, movie_id, unmonitor=unmonitor, app=app)
 
 
+@tool(write=True)
+async def set_monitoring(
+    ctx: Ctx,
+    app: Literal["sonarr", "radarr", "whisparr"],
+    item_id: int,
+    monitored: bool,
+    season: Optional[int] = None,
+    episodes: Optional[list[int]] = None,
+) -> dict[str, Any]:
+    """Turn monitoring ON or OFF without deleting anything — the way to stop (or resume)
+    downloads of a series, a season, some episodes, a movie or a Whisparr scene.
+
+    Args:
+        app: The app the item lives in.
+        item_id: Sonarr series id, or Radarr/Whisparr movie id (from search_library).
+        monitored: True to monitor, False to stop monitoring.
+        season: Sonarr only: just this season (or the season of `episodes`).
+        episodes: Sonarr only: just these episode numbers of `season`.
+    """
+    title = await library.item_title(ctx.deps, app, item_id)
+    scope = f" season {season}" if season is not None and not episodes else ""
+    scope += f" S{season:02d} episodes {', '.join(map(str, episodes))}" if episodes and season is not None else ""
+    approve(ctx, f"{'Monitor' if monitored else 'Stop monitoring'} {title}{scope} in {app.capitalize()}")
+    return await library.set_monitored(ctx.deps, app=app, item_id=item_id, monitored=monitored, season=season, episodes=episodes)
+
+
+@tool(write=True)
+async def remove_from_library(
+    ctx: Ctx,
+    app: Literal["sonarr", "radarr", "whisparr"],
+    item_id: int,
+    delete_files: bool = False,
+    exclude: bool = False,
+) -> dict[str, Any]:
+    """Remove a series, movie or Whisparr scene from its app entirely. Files are kept
+    unless delete_files is true. Use set_monitoring instead to only stop downloads.
+
+    Args:
+        app: The app the item lives in.
+        item_id: Sonarr series id, or Radarr/Whisparr movie id.
+        delete_files: Also delete its files from disk.
+        exclude: Add an import exclusion so lists do not add it back.
+    """
+    title = await library.item_title(ctx.deps, app, item_id)
+    what = " AND DELETE ITS FILES" if delete_files else " (files kept)"
+    approve(ctx, f"Remove {title} from {app.capitalize()}{what}")
+    return await library.remove_from_library(ctx.deps, app=app, item_id=item_id, delete_files=delete_files, exclude=exclude)
+
+
 @tool("whisparr")
 async def whisparr_lookup(ctx: Ctx, term: str, item_type: Literal["scene", "movie"] = "scene") -> list[dict[str, Any]]:
     """Find an adult scene or movie in Whisparr's metadata (to add it). Only use when the
