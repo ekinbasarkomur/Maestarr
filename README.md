@@ -46,13 +46,23 @@ without your approval.
   import them into the right series.
 - **Recommendations from your history** (Jellyfin, Trakt, AniList, Letterboxd)
   with moods — *melancholic*, *cozy*, *mind-bending* — TMDB metadata and IMDb
-  ratings. Titles you already own are flagged as an easy “watch tonight”.
+  ratings. Titles you already own are flagged as an easy “watch tonight”. With no
+  history yet, your Sonarr/Radarr library stands in for it.
+- **Picks as cards** — when the assistant recommends something, the chat shows
+  a swipeable row of cards: the poster Sonarr/Radarr use, a description, the
+  reason it was picked, and a **Search** button that adds the title and judges
+  its releases.
 - **Library control** — add, search, check the queue and disks, delete what
   you watched (and the torrents still holding its data).
 - **Approval first** — every change waits for your approval: a card in the UI,
   buttons in Telegram, a destructive flag over MCP.
 - **Set up in the browser** — a guided first run, with a connection test for
-  every service and every setting editable later. No config files.
+  every service and every setting editable later. No config files. Telegram
+  pairs itself: test the bot token, send `/start`, done.
+- **Adult content behind one switch** — off by default. While it is off,
+  Maestarr never contacts Whisparr or StashDB and shows no adult results. When
+  it is on, Discover gets an Adult tab with new scenes from the studios and
+  performers in your Whisparr library.
 - **Any model** — Anthropic, OpenAI, Google, OpenRouter, a local Ollama, or any
   OpenAI-compatible server.
 
@@ -78,7 +88,7 @@ without your approval.
 | [TMDB](https://www.themoviedb.org) | titles, themes and posters | recommended |
 | [OMDb](https://www.omdbapi.com) | IMDb ratings | optional |
 | [Trakt](https://trakt.tv), [AniList](https://anilist.co), Letterboxd export | more history | optional |
-| [Whisparr](https://whisparr.com) v3, [StashDB](https://stashdb.org) | adult content — off unless configured | optional |
+| [Whisparr](https://whisparr.com) v3, [StashDB](https://stashdb.org) | adult content — only while the 18+ switch is on | optional |
 | Telegram | chat from your phone | optional |
 
 ## Installation

@@ -20,6 +20,7 @@ from pydantic_ai import ApprovalRequired, FunctionToolset, RunContext, ToolDefin
 
 from maestarr.clients.base import ServiceError
 from maestarr.ops import discovery, downloads, library, releases
+from maestarr.ops import picks as picks_ops
 from maestarr.services import Services
 
 logger = logging.getLogger(__name__)
@@ -557,6 +558,34 @@ async def adult_search(ctx: Ctx, query: str, what: Literal["scenes", "performers
         what: scenes or performers.
     """
     return await discovery.adult_search(ctx.deps, query, what)
+
+
+@tool("stashdb")
+async def adult_recommend(ctx: Ctx, query: Optional[str] = None, limit: int = 12) -> dict[str, Any]:
+    """Adult scene picks: new scenes from the studios and performers in the user's Whisparr
+    library (or StashDB matches for `query`). Only when the user asks for adult content.
+
+    Args:
+        query: Optional search text (studio, performer, theme). Leave empty for library-based picks.
+        limit: How many scenes.
+    """
+    return await discovery.adult_picks(ctx.deps, query, limit)
+
+
+@tool()
+async def show_recommendations(ctx: Ctx, picks: list[picks_ops.Pick]) -> dict[str, Any]:
+    """Show your recommendations to the user as visual cards: poster or scene image,
+    description, your reason, and a Search button under each.
+
+    Call it ONCE with your final picks whenever you recommend titles or scenes (after
+    choosing them with recommend, search_titles, adult_recommend or adult_search). Give
+    real ids from those tools (tmdb_id / tvdb_id / stash_id). Afterwards reply with one or
+    two sentences; do not repeat each title's details, the cards show them.
+
+    Args:
+        picks: The chosen items, best first, each with a one-sentence `why`.
+    """
+    return await picks_ops.present(ctx.deps, picks)
 
 
 # --------------------------------------------------------------------------

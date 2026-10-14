@@ -1,9 +1,7 @@
 import { AlertTriangle, Check, ChevronRight, Loader2, ShieldQuestion, X } from 'lucide-react'
 import { useState } from 'react'
 
-import { MediaTile } from '@/components/MediaCard'
 import { Badge, Button } from '@/components/ui/primitives'
-import type { MediaRef } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
 import { toolLabel } from './toolMeta'
@@ -189,39 +187,6 @@ export function VerdictCard({ data }: { data: Verdict }) {
           ? ` Only ${data.verdict.files_to_select} files of the pack would be downloaded.`
           : ''}
       </p>
-    </div>
-  )
-}
-
-export function RecommendationStrip({
-  items,
-  onPick,
-}: {
-  items: MediaRef[]
-  onPick: (r: MediaRef) => void
-}) {
-  return (
-    <div className="scroll-thin -mx-1 flex snap-x gap-3 overflow-x-auto px-1 pb-2">
-      {items.map((r) => (
-        <div key={`${r.kind}-${r.tmdb_id}-${r.title}`} className="w-32 shrink-0 snap-start">
-          <MediaTile
-            title={r.title}
-            year={r.year}
-            poster={r.poster_url}
-            kind={r.kind}
-            rating={r.imdb_rating ?? r.rating}
-            inLibrary={r.in_library}
-            onClick={() => onPick(r)}
-            footer={
-              r.why?.[0] ? (
-                <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
-                  {r.why[0]}
-                </p>
-              ) : null
-            }
-          />
-        </div>
-      ))}
     </div>
   )
 }

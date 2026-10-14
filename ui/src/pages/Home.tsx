@@ -33,14 +33,26 @@ export default function HomePage() {
   const [prompt, setPrompt] = useState('')
 
   useEffect(() => {
-    api
-      .overview()
-      .then(setOverview)
-      .catch(() => setOverview(null))
+    let alive = true
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const load = () =>
+      api
+        .overview()
+        .then((o) => {
+          if (!alive) return
+          if (o.loading) timer = setTimeout(load, 5000)
+          else setOverview(o)
+        })
+        .catch(() => alive && setOverview(null))
+    void load()
     api
       .recommendations('movie')
       .then(setPicks)
       .catch((e) => setPicksError((e as Error).message))
+    return () => {
+      alive = false
+      clearTimeout(timer)
+    }
   }, [])
 
   const ask = (text: string) => {

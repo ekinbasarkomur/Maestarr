@@ -29,6 +29,8 @@ export const TOOL_LABELS: Record<string, [running: string, done: string]> = {
   taste_profile: ['Reading your taste', 'Read your taste'],
   recommend: ['Finding picks for you', 'Found picks'],
   adult_search: ['Searching StashDB', 'Searched StashDB'],
+  adult_recommend: ['Finding scenes for you', 'Found scenes'],
+  show_recommendations: ['Preparing your picks', 'Your picks'],
   whisparr_lookup: ['Searching Whisparr', 'Searched Whisparr'],
   whisparr_add: ['Adding to Whisparr', 'Added to Whisparr'],
   get_preferences: ['Reading preferences', 'Read preferences'],

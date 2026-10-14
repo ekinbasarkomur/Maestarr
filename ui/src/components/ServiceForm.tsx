@@ -359,7 +359,13 @@ export function ServiceCard({
           </div>
           <p className="truncate text-xs text-muted-foreground">{def.tagline}</p>
         </div>
-        {configured ? <Badge tone="success">Configured</Badge> : <Badge>Not set</Badge>}
+        {configured && def.adult && !sections.adult?.MAESTARR_ADULT_CONTENT ? (
+          <Badge>18+ off</Badge>
+        ) : configured ? (
+          <Badge tone="success">Configured</Badge>
+        ) : (
+          <Badge>Not set</Badge>
+        )}
         <ChevronDown
           className={cn('size-4 text-muted-foreground transition-transform', open && 'rotate-180')}
         />

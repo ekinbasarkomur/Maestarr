@@ -114,7 +114,6 @@ export default function SettingsPage() {
                       onSaved={setSections}
                     />
                   ))}
-                {tab === 'discovery' && <AdultSwitch sections={sections} onSaved={setSections} />}
                 {tab === 'discovery' &&
                   ['tmdb', 'omdb', 'trakt', 'anilist', 'stashdb'].map((id) => (
                     <ServiceCard
@@ -124,6 +123,7 @@ export default function SettingsPage() {
                       onSaved={setSections}
                     />
                   ))}
+                {tab === 'discovery' && <AdultSwitch sections={sections} onSaved={setSections} />}
                 {tab === 'telegram' && (
                   <Section title="Telegram" subtitle={SERVICES.telegram.tagline}>
                     <TelegramForm sections={sections} onSaved={setSections} />
@@ -204,7 +204,11 @@ function GeneralTab() {
                   className="ml-auto truncate text-xs text-muted-foreground"
                   title={s.detail ?? undefined}
                 >
-                  {!s.configured ? 'not set' : s.ok ? s.version : (s.detail ?? 'unreachable')}
+                  {!s.configured
+                    ? (s.detail ?? 'not set')
+                    : s.ok
+                      ? s.version
+                      : (s.detail ?? 'unreachable')}
                 </span>
               </li>
             ))}

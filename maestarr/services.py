@@ -188,8 +188,16 @@ class Services:
     async def status(self) -> list[ServiceStatus]:
         """Reachability of every integration (used by `doctor` and the UI)."""
 
+        adult_off = not self.settings.MAESTARR_ADULT_CONTENT
+        adult_saved = {
+            "whisparr": bool(self.settings.WHISPARR_URL),
+            "stashdb": bool(self.settings.STASHDB_ENABLED and secret(self.settings.STASHDB_API_KEY)),
+        }
+
         async def check(name: str, client: Optional[HttpService], probe: Any) -> ServiceStatus:
             if client is None:
+                if adult_off and adult_saved.get(name):
+                    return ServiceStatus(name=name, configured=False, detail="18+ off")
                 return ServiceStatus(name=name, configured=False)
             try:
                 version = await probe()

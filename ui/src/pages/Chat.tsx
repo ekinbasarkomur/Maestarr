@@ -11,15 +11,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router'
 
 import { Markdown } from '@/components/chat/Markdown'
+import { PickCarousel } from '@/components/chat/PickCarousel'
 import {
   ApprovalCard,
-  RecommendationStrip,
   ToolActivity,
   VerdictCard,
   type ToolPartView,
 } from '@/components/chat/ToolPart'
 import { Badge, Button, Logo, Spinner } from '@/components/ui/primitives'
-import { api, type Conversation, type MediaRef } from '@/lib/api'
+import { api, type Conversation } from '@/lib/api'
+import { type PickCard, searchPrompt } from '@/lib/picks'
 import { cn } from '@/lib/utils'
 
 function newId() {
@@ -503,20 +504,16 @@ function MessageRow({
             )
           }
           if (
-            view.name === 'recommend' &&
+            view.name === 'show_recommendations' &&
             p.state === 'output-available' &&
-            Array.isArray(output?.recommendations)
+            Array.isArray(output?.cards)
           ) {
             return (
               <div key={i} className="space-y-2">
                 <ToolActivity part={view} />
-                <RecommendationStrip
-                  items={output.recommendations as MediaRef[]}
-                  onPick={(r) =>
-                    onAsk(
-                      `I'd like ${r.title} (${r.year ?? ''}, tmdb ${r.tmdb_id}). Get it for me.`,
-                    )
-                  }
+                <PickCarousel
+                  cards={output.cards as PickCard[]}
+                  onSearch={(c) => onAsk(searchPrompt(c))}
                 />
               </div>
             )

@@ -90,6 +90,7 @@ export interface StatusResponse {
   version: string
   model: string
   model_ready: boolean
+  adult_content?: boolean
   services: ServiceStatus[]
 }
 
@@ -112,6 +113,8 @@ export interface Disk {
 }
 
 export interface Overview {
+  /** The server is still building the first overview; ask again shortly. */
+  loading?: boolean
   counts: { series: number; episodes_on_disk: number; movies: number; movies_on_disk: number }
   disks: Disk[]
   queue: QueueItem[]
@@ -148,6 +151,11 @@ export interface MediaRef {
 export interface Recommendations {
   based_on: string[]
   recommendations: MediaRef[]
+}
+
+export interface AdultPicks {
+  based_on: string[]
+  scenes: import('./picks').PickCard[]
 }
 
 export interface Conversation {
@@ -203,6 +211,8 @@ export const api = {
     get<Recommendations>(
       `/api/recommendations?kind=${kind}${mood ? `&mood=${encodeURIComponent(mood)}` : ''}`,
     ),
+  adult: (query?: string) =>
+    get<AdultPicks>(`/api/adult${query ? `?query=${encodeURIComponent(query)}` : ''}`),
   preferences: () => get<Preferences>('/api/preferences'),
   savePreferences: (changes: Partial<Preferences>) =>
     send<{ saved: Preferences }>('PUT', '/api/preferences', changes),

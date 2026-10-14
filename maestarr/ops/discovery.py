@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections import Counter
 from datetime import datetime
 from typing import Any, Literal, Optional
 
@@ -234,6 +235,7 @@ async def recommendations(
     limit: int = 8,
     include_owned: bool = True,
 ) -> dict[str, Any]:
+    svc.need_tmdb()  # fail fast: reading history can take a minute on a busy Jellyfin
     profile = await taste_profile(svc)
     owned, ids = await library_index(svc)
     history = await watch_history(svc)
@@ -269,3 +271,123 @@ async def adult_search(svc: Services, query: str, what: Literal["scenes", "perfo
     if what == "performers":
         return await svc.stashdb.search_performers(query)
     return await svc.stashdb.search_scenes(query)
+
+
+def _adult_gate(svc: Services) -> None:
+    if not svc.settings.MAESTARR_ADULT_CONTENT:
+        raise ServiceError("stashdb", "adult content is switched off (Settings → Discovery)")
+    if not svc.stashdb:
+        raise ServiceError("stashdb", "StashDB is not set up — enable it and add an API key under Settings → Discovery")
+
+
+async def adult_picks(svc: Services, query: Optional[str] = None, limit: int = 12) -> dict[str, Any]:
+    """Adult scenes for the Discover page and the agent.
+
+    With a query: StashDB search. Without one: new scenes from the studios and
+    performers the Whisparr library holds most of (StashDB trending when the
+    library is empty). Scenes already in Whisparr are marked or left out.
+    """
+    _adult_gate(svc)
+    stash = svc.stashdb
+    assert stash is not None
+    memo_key = f"adult_picks:{(query or '').strip().lower()}:{limit}"
+    cached = svc.memo.get(memo_key)
+    if cached and time.time() - cached[0] < ADULT_TTL:
+        return dict(cached[1])
+    result = await _adult_picks(svc, stash, query, limit)
+    svc.memo[memo_key] = (time.time(), result)
+    return result
+
+
+ADULT_TTL = 10 * 60
+
+
+async def _adult_picks(svc: Services, stash: Any, query: Optional[str], limit: int) -> dict[str, Any]:
+    library = await svc.whisparr.movies() if svc.whisparr else []
+    owned = {str(m.get("stashId") or m.get("foreignId")) for m in library}
+    studio_count: Counter[str] = Counter()
+    studio_name: dict[str, str] = {}
+    performer_count: Counter[str] = Counter()
+    performer_name: dict[str, str] = {}
+    for m in library:
+        if m.get("studioForeignId"):
+            studio_count[m["studioForeignId"]] += 1
+            studio_name[m["studioForeignId"]] = m.get("studioTitle") or "?"
+        for pid, name in zip(m.get("performerForeignIds") or [], m.get("performerNames") or []):
+            performer_count[pid] += 1
+            performer_name[pid] = name
+
+    based_on: list[str] = []
+    if query:
+        scenes = await stash.search_scenes(query, limit=limit * 2)
+        reasons = {s["id"]: [f"Matches “{query}”"] for s in scenes}
+    elif studio_count or performer_count:
+        studios = [sid for sid, _ in studio_count.most_common(3)]
+        # Libraries are full of the same few male performers; follow the women first.
+        top = [pid for pid, n in performer_count.most_common(60) if n >= 2]
+        genders = await _genders(svc, stash, top)
+        women = [p for p in top if genders.get(p) == "FEMALE"]
+        performers = women[:6] if len(women) >= 3 else (women + [p for p in top if p not in women])[:6]
+        based_on = [studio_name[s] for s in studios] + [performer_name[p] for p in performers[:4]]
+        # One query per performer, interleaved, so the most prolific one does not fill the page.
+        batches = await asyncio.gather(
+            stash.query_scenes(studios=studios, per_page=40) if studios else _none(),
+            *(stash.query_scenes(performers=[p], per_page=12) for p in performers),
+        )
+        scenes = [s for pair in _interleave(*batches) for s in pair]
+        reasons = {}
+        for s in scenes:
+            why = []
+            if s.get("studio_id") in studio_count:
+                why.append(f"From {s['studio']} — {studio_count[s['studio_id']]} of their scenes are in your library")
+            liked = [p for p in s.get("performer_ids", []) if p in performers]
+            if liked:
+                n = performer_count[liked[0]]
+                why.append(f"With {performer_name[liked[0]]}, who is in {n} of your scenes")
+            reasons[s["id"]] = why or ["Similar to your library"]
+    else:
+        scenes = await stash.query_scenes(sort="TRENDING", per_page=limit * 2)
+        reasons = {s["id"]: ["Trending on StashDB this week"] for s in scenes}
+
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for s in scenes:
+        if s["id"] in seen:
+            continue
+        seen.add(s["id"])
+        in_library = s["id"] in owned
+        if in_library and not query:
+            continue
+        out.append({**s, "kind": "scene", "stash_id": s["id"], "why": reasons.get(s["id"], []), "in_library": in_library})
+        if len(out) >= limit:
+            break
+    return {"based_on": based_on, "scenes": out}
+
+
+async def _genders(svc: Services, stash: Any, ids: list[str]) -> dict[str, str]:
+    known: dict[str, str] = svc.memo.setdefault("performer_genders", {})
+    missing = [i for i in ids if i not in known]
+    if missing:
+        try:
+            known.update(await stash.performer_genders(missing))
+        except ServiceError as exc:
+            logger.warning("performer genders unavailable: %s", exc)
+    return known
+
+
+async def _none() -> list[dict[str, Any]]:
+    return []
+
+
+def _interleave(*lists: list[Any]) -> list[tuple[Any, ...]]:
+    """Alternate between result lists so one source does not crowd out the other.
+
+    >>> _interleave([1, 2, 3], ["a"])
+    [(1,), ('a',), (2,), (3,)]
+    """
+    out: list[tuple[Any, ...]] = []
+    for i in range(max((len(x) for x in lists), default=0)):
+        for x in lists:
+            if i < len(x):
+                out.append((x[i],))
+    return out
