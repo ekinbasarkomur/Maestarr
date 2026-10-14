@@ -1,0 +1,60 @@
+[project]
+name = "maestarr"
+version = "0.1.0"
+description = "Maestarr — an AI maestro for your *arr stack: taste-aware recommendations, release judging with live swarm data, and chat control of Sonarr, Radarr, Prowlarr and qBittorrent"
+requires-python = ">=3.12"
+authors = [{ name = "Ekin Başar Kömür" }]
+dependencies = [
+    "typer>=0.12",
+    "python-dotenv>=1.0",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "fastmcp>=3.3",
+    # >=0.135 for first-party SSE (fastapi.sse). See .claude/rules/async.md.
+    "fastapi>=0.135",
+    "uvicorn>=0.29",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "mypy>=1.0",
+    "pytest-asyncio>=1.0",
+    # AsyncClient + ASGITransport — FastAPI's TestClient cannot be used inside
+    # async test functions.
+    "httpx>=0.27",
+]
+
+[project.scripts]
+maestarr = "maestarr.cli:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["maestarr*"]
+
+[tool.pytest.ini_options]
+# The package itself is included so --doctest-modules reaches the docstring
+# examples in it. Docstrings go stale silently otherwise; running them makes
+# the examples load-bearing instead of decorative.
+testpaths = ["tests", "maestarr"]
+addopts = "-ra --doctest-modules"
+# asyncio is this project's only async library, so auto mode is the documented
+# recommendation: async tests and fixtures run without an explicit marker.
+# (strict is pytest-asyncio's default only so it can coexist with trio/anyio.)
+asyncio_mode = "auto"
+# The `integration` marker is authoritative; the tests/{unit,integration,e2e}
+# directory layout is belt-and-suspenders on top of it. `unit` and `e2e` are
+# registered so pytest never warns if one is later added inline. See
+# tests/TESTING.md.
+markers = [
+    "integration: marks tests as integration tests requiring real infrastructure (deselect with '-m \"not integration\"')",
+    "unit: pure tests with no database, no network, no server, no subprocess",
+    "e2e: full end-to-end flows, or the CLI run as a real subprocess",
+]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true

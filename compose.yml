@@ -1,0 +1,34 @@
+# Maestarr next to an existing *arr stack.
+#
+# Put this service on the same Docker network as Sonarr/Radarr/Prowlarr/
+# qBittorrent so it can reach them by service name (http://sonarr:8989 ...).
+# The example below assumes an external network called `arr`; change the name
+# to whatever your stack uses, or drop the `networks:` blocks and use host
+# addresses in `.env` instead.
+
+services:
+  maestarr:
+    build: .
+    image: maestarr:local
+    container_name: maestarr
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Must be 0.0.0.0 inside a container; the ports line below decides who
+      # can actually reach it.
+      MAESTARR_HOST: 0.0.0.0
+      MAESTARR_DATA_DIR: /data
+      MAESTARR_LOG_DIR: /data/logs
+    volumes:
+      - ./data:/data
+    ports:
+      # Loopback only. Put a reverse proxy (with auth) in front before exposing
+      # it anywhere else — Maestarr can add and delete things in your stack.
+      - "127.0.0.1:8709:8709"
+    mem_limit: 512m
+    networks:
+      - arr
+
+networks:
+  arr:
+    external: true

@@ -1,0 +1,32 @@
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+*.pyc
+.env
+.env.docker
+# Local .env backups — these carry DATABASE_URL with its password.
+# .env.example and .env.docker.example stay tracked; they hold placeholders only.
+.env.*backup*
+.claude/settings.local.json
+.DS_Store
+logs/
+dist/
+build/
+
+# Runtime state
+data/
+*.sqlite3
+
+# Local agent-workflow material (Claude Code scaffolding from the generator
+# template) — personal working files, not part of the open-source project.
+.claude/
+CLAUDE.md
+specs/
+
+# Frontend
+ui/node_modules/
+ui/dist/
