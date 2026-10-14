@@ -21,7 +21,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/home.png" alt="Maestarr home screen" />
+  <img src="docs/demo.gif" alt="Maestarr: picks as cards, a details popup with the trailer, and a judged release list" />
 </p>
 
 Maestarr sits next to Sonarr, Radarr, Prowlarr, qBittorrent and Jellyfin and
@@ -81,17 +81,17 @@ without your approval.
 
 <p align="center"><img src="docs/screenshots/chat.png" width="720" alt="Recommendations as cards in the chat, each with a Search button" /></p>
 
-| Details | Release judge |
+| Home | Settings |
 | --- | --- |
+| ![Home: downloads, library and recently added](docs/screenshots/home.png) | ![Settings with live service status](docs/screenshots/settings.png) |
+| **Details** | **Release judge** |
 | ![A title's details: backdrop, trailer, ratings, tags](docs/screenshots/details.png) | ![Judged releases as a pick list with Download buttons](docs/screenshots/release-picker.png) |
 
 | Onboarding | Service setup |
 | --- | --- |
 | ![Choosing an AI provider during setup](docs/screenshots/setup-ai.png) | ![Testing Sonarr and picking defaults](docs/screenshots/setup-services.png) |
-| **Status** | **Download preferences** |
-| ![Settings with live service status](docs/screenshots/settings.png) | ![Download preferences](docs/screenshots/preferences.png) |
-
-<p align="center"><img src="docs/screenshots/mobile.png" width="260" alt="Maestarr on a phone" /></p>
+| **Download preferences** | **On a phone** |
+| ![Download preferences](docs/screenshots/preferences.png) | <img src="docs/screenshots/mobile.png" width="260" alt="Maestarr on a phone" /> |
 
 ## Supported apps
 
