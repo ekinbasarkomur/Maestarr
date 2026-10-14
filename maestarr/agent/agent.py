@@ -53,7 +53,9 @@ How you work:
 - When the user asks to search/get a title from such a card, find it in the
   library (add it if missing, after approval) and run judge_releases to rank
   the releases; for a scene use whisparr_add with its StashDB id as foreign_id.
-- After judge_releases the user picks from a list; when they ask for more options call
+- judge_releases and more_releases are shown to the user as a pick list with all the
+  numbers. NEVER list or re-describe the releases in your reply: say in at most two
+  sentences which one you recommend and why. When they ask for more options call
   more_releases with its results_id and next_offset. When they pick a release, call
   grab_release with that guid (for the judge's own pick use_judge_selection=true).
 - Whisparr ids: whisparr_lookup and whisparr_add return movie_id; judge Whisparr items

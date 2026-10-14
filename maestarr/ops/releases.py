@@ -184,14 +184,34 @@ async def judge_releases(
     # Keep the rest of the search, best first, for "show more results".
     judged = {a.candidate.guid for a in result.assessments}
     hashes = {(a.candidate.info_hash or "").lower() for a in result.assessments} - {""}
-    rest = [
+    rest = _dedupe(
         r for r in prerank(releases, svc.preferences())
         if r.guid not in judged and (r.info_hash or "").lower() not in hashes
-    ]
+    )
     results_id = uuid.uuid4().hex[:8]
     svc.memo[f"results:{results_id}"] = {"request": request, "rest": rest, "at": time.time()}
     out["results_id"] = results_id
     out["more_available"] = len(rest)
+    return out
+
+
+def _dedupe(releases: Any) -> list[ReleaseCandidate]:
+    """The same torrent listed by several indexers: keep the first (best ranked) copy.
+
+    >>> from maestarr.domain import ReleaseCandidate as R
+    >>> rs = [R(app="radarr", guid=g, indexer_id=1, title=t, size=s) for g, t, s in
+    ...       [("a", "Movie.1080p-GRP", 5 * 10**9), ("b", "Movie 1080p GRP", 5 * 10**9), ("c", "Movie.1080p-GRP", 9 * 10**9)]]
+    >>> [r.guid for r in _dedupe(rs)]
+    ['a', 'c']
+    """
+    seen: set[tuple[str, int]] = set()
+    out = []
+    for r in releases:
+        key = ("".join(ch for ch in r.title.lower() if ch.isalnum()), round((r.size or 0) / 1e7))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(r)
     return out
 
 

@@ -216,8 +216,12 @@ export function ReleasePicker({
                   <p className="truncate text-[13px] font-medium" title={r.title}>
                     {r.title}
                   </p>
-                  {isPick && <Badge tone="success">Recommended</Badge>}
-                  {isRunnerUp && <Badge>Runner-up</Badge>}
+                  {isPick && (
+                    <Badge tone="success" className="shrink-0 whitespace-nowrap">
+                      Recommended
+                    </Badge>
+                  )}
+                  {isRunnerUp && <Badge className="shrink-0 whitespace-nowrap">Runner-up</Badge>}
                 </div>
                 <p className="truncate text-[11px] text-muted-foreground">{meta.join(' · ')}</p>
                 {note && (
@@ -289,7 +293,7 @@ export function ReleasePicker({
         )}
         <p className="ml-auto text-[11px] text-muted-foreground">
           {verdict?.files_to_select
-            ? `Only ${verdict.files_to_select} files of the pack would be downloaded. `
+            ? `Only ${verdict.files_to_select} ${verdict.files_to_select === 1 ? 'file' : 'files'} of the pack would be downloaded. `
             : ''}
           Downloads ask for approval.
         </p>
