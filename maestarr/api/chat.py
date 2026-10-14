@@ -37,9 +37,8 @@ def _first_user_text(body: dict[str, Any]) -> str:
 
 @router.post("/chat")
 async def chat(request: Request, _: Any = Depends(require_user)) -> Response:
-    from pydantic_ai.ui.vercel_ai import VercelAIAdapter
-
     from maestarr.agent.agent import get_agent
+    from maestarr.api.stream import MaestarrAdapter
     from maestarr.services import get_services
 
     agent = get_agent()
@@ -62,7 +61,7 @@ async def chat(request: Request, _: Any = Depends(require_user)) -> Response:
         if cid:
             await store.save_messages(cid, result.all_messages())
 
-    return await VercelAIAdapter.dispatch_request(
+    return await MaestarrAdapter.dispatch_request(
         request,
         agent=agent,
         deps=get_services(),

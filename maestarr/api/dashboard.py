@@ -4,6 +4,7 @@ preferences."""
 from __future__ import annotations
 
 import asyncio
+import time
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends
@@ -16,6 +17,8 @@ from maestarr.llm import model_label
 from maestarr.services import get_services
 
 router = APIRouter(prefix="/api", tags=["dashboard"])
+
+OVERVIEW_TTL = 20.0
 
 
 @router.get("/status")
@@ -44,23 +47,29 @@ async def overview(_: Any = Depends(require_user)) -> dict[str, Any]:
     from maestarr.ops import discovery, library
 
     svc = get_services()
+    cached = svc.memo.get("overview")
+    if cached and time.monotonic() - cached[0] < OVERVIEW_TTL:
+        return cached[1]
 
     async def safe(coro: Any, default: Any) -> Any:
         try:
             return await coro
-        except (ServiceError, Exception):  # noqa: BLE001 — one dead service must not blank the page
+        except Exception:  # noqa: BLE001 — one dead service must not blank the page
             return default
 
-    series = await safe(svc.sonarr.series(), []) if svc.sonarr else []
-    movies = await safe(svc.radarr.movies(), []) if svc.radarr else []
-    queue, disks, history = await asyncio.gather(
+    async def nothing() -> list[Any]:
+        return []
+
+    series, movies, queue, disks, history = await asyncio.gather(
+        safe(svc.sonarr.series(), []) if svc.sonarr else nothing(),
+        safe(svc.radarr.movies(), []) if svc.radarr else nothing(),
         safe(library.queue(svc), []),
         safe(library.disk_usage(svc), []),
-        safe(discovery.recent_history(svc, 12), []) if svc.jellyfin else asyncio.sleep(0, []),
+        safe(discovery.recent_history(svc, 12), []) if svc.jellyfin else nothing(),
     )
     recent_series = sorted(series, key=lambda s: s.get("added", ""), reverse=True)[:12]
     recent_movies = sorted([m for m in movies if m.get("hasFile")], key=lambda m: m.get("added", ""), reverse=True)[:12]
-    return {
+    result = {
         "counts": {
             "series": len(series),
             "episodes_on_disk": sum((s.get("statistics") or {}).get("episodeFileCount", 0) for s in series),
@@ -79,6 +88,8 @@ async def overview(_: Any = Depends(require_user)) -> dict[str, Any]:
             for m in recent_movies
         ],
     }
+    svc.memo["overview"] = (time.monotonic(), result)
+    return result
 
 
 @router.get("/queue")

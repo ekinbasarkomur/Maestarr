@@ -1,0 +1,149 @@
+/*
+ * Tailwind v4 — CSS-first configuration; there is NO tailwind.config.js.
+ * Maestarr's palette: a dark concert hall with a brass accent.
+ */
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: #0a0c10;
+  --foreground: #e8e6e1;
+  --muted: #17181e;
+  --muted-foreground: #8d8a85;
+  --card: #14151b;
+  --card-foreground: #e8e6e1;
+  --border: #262832;
+  --ring: #d4a64a;
+  --primary: #d4a64a;
+  --primary-foreground: #14110a;
+  --accent: #1d1f27;
+  --success: #5fb38a;
+  --danger: #e06c6c;
+  --radius: 0.6rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --radius-lg: var(--radius);
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    background:
+      radial-gradient(1200px 700px at 12% -10%, rgba(64, 92, 140, 0.22), transparent 60%),
+      radial-gradient(900px 600px at 100% 0%, rgba(40, 110, 120, 0.14), transparent 60%),
+      radial-gradient(900px 700px at 50% 110%, rgba(212, 166, 74, 0.07), transparent 60%),
+      var(--background);
+    background-attachment: fixed;
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--primary) 35%, transparent);
+  }
+}
+
+/* Markdown inside assistant messages. */
+.prose-chat p {
+  margin: 0.4rem 0;
+  line-height: 1.6;
+}
+.prose-chat ul,
+.prose-chat ol {
+  margin: 0.4rem 0;
+  padding-left: 1.3rem;
+}
+.prose-chat ul {
+  list-style: disc;
+}
+.prose-chat ol {
+  list-style: decimal;
+}
+.prose-chat li {
+  margin: 0.15rem 0;
+}
+.prose-chat strong {
+  color: #fff;
+}
+.prose-chat a {
+  color: var(--primary);
+  text-decoration: underline;
+}
+.prose-chat code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--accent);
+  padding: 0.05rem 0.3rem;
+  border-radius: 0.3rem;
+}
+.prose-chat table {
+  border-collapse: collapse;
+  margin: 0.5rem 0;
+  font-size: 0.9em;
+}
+.prose-chat th,
+.prose-chat td {
+  border: 1px solid var(--border);
+  padding: 0.25rem 0.5rem;
+  text-align: left;
+}
+.prose-chat h1,
+.prose-chat h2,
+.prose-chat h3 {
+  font-weight: 600;
+  margin: 0.6rem 0 0.3rem;
+}
+
+/* Frosted glass surfaces (the look of ElegantFin-style Jellyfin themes). */
+@utility glass {
+  background: rgba(255, 255, 255, 0.045);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 40px -12px rgba(0, 0, 0, 0.55);
+}
+@utility glass-strong {
+  background: rgba(16, 18, 24, 0.72);
+  backdrop-filter: blur(28px) saturate(150%);
+  -webkit-backdrop-filter: blur(28px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 20px 60px -20px rgba(0, 0, 0, 0.7);
+}
+@utility scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+
+.select-chevron {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238d8a85' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+}
+select option {
+  background: #14151b;
+}

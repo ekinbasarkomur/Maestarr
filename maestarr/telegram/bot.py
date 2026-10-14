@@ -147,7 +147,10 @@ def build_dispatcher(channel: TelegramChannel) -> Dispatcher:
     @dp.message(CommandStart())
     async def start(message: Message) -> None:
         if not channel.allowed_chat(message.chat.id):
-            await message.answer(f"This chat is not allowed. Add {message.chat.id} to TELEGRAM_ALLOWED_CHAT_IDS.")
+            await message.answer(
+                f"Hi! This chat's id is {message.chat.id}.\n"
+                "Add it under Settings → Telegram → Allowed chat ids in Maestarr, then send /start again."
+            )
             return
         await message.answer(HELP)
 

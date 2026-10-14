@@ -42,7 +42,9 @@ class BotSupervisor:
     async def sync(self) -> None:
         s = get_settings()
         token = secret(s.TELEGRAM_BOT_TOKEN) or ""
-        wanted = (token, tuple(s.TELEGRAM_ALLOWED_CHAT_IDS)) if token and s.TELEGRAM_ALLOWED_CHAT_IDS else None
+        # Runs as soon as a token is set: an unlisted chat that sends /start is
+        # told its chat id, which is how users find the id to allow.
+        wanted = (token, tuple(s.TELEGRAM_ALLOWED_CHAT_IDS)) if token else None
         if wanted == self.signature and (self.task is None or not self.task.done()):
             return
         await self.stop()

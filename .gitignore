@@ -30,3 +30,6 @@ specs/
 # Frontend
 ui/node_modules/
 ui/dist/
+
+# Built web UI (produced by `npm run build` in ui/ and by the Docker build)
+maestarr/web/
