@@ -11,6 +11,7 @@ export const TOOL_LABELS: Record<string, [running: string, done: string]> = {
   find_releases: ['Searching indexers', 'Searched indexers'],
   search_indexers: ['Searching all indexers', 'Searched all indexers'],
   judge_releases: ['Judging releases — reading files and live seeders', 'Judged releases'],
+  more_releases: ['Getting more results', 'More results'],
   inspect_release: ['Looking inside the release', 'Looked inside the release'],
   grab_release: ['Starting the download', 'Download started'],
   select_torrent_files: ['Selecting files', 'Selected files'],

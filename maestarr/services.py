@@ -21,6 +21,7 @@ from maestarr.clients.prowlarr import ProwlarrClient
 from maestarr.clients.qbittorrent import QBittorrentClient
 from maestarr.clients.stashdb import StashDbClient
 from maestarr.clients.tmdb import TmdbClient
+from maestarr import net
 from maestarr.config import Settings, secret
 from maestarr.domain import ServiceStatus
 from maestarr.preferences import Preferences, load_preferences, save_preferences
@@ -70,6 +71,8 @@ class Services:
     def from_settings(cls, s: Settings) -> "Services":
         def both(url: Optional[str], key: Any) -> bool:
             return bool(url) and bool(secret(key))
+
+        net.configure(s)  # clients built below pick their proxy from it
 
         return cls(
             settings=s,

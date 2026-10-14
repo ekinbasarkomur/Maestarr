@@ -51,12 +51,16 @@ class HttpService:
     @property
     def client(self) -> httpx.AsyncClient:
         if self._client is None:
+            from maestarr import net
+
             self._client = httpx.AsyncClient(
                 base_url=self.base_url,
                 headers=self._headers,
                 params=self._params,
                 timeout=self._timeout,
                 transport=self._transport,
+                # Settings → Proxy; LAN services and the bypass list go direct.
+                proxy=None if self._transport else net.proxy_for(self.base_url),
                 follow_redirects=True,
             )
         return self._client

@@ -392,23 +392,49 @@ async def wanted_missing(svc: Services) -> list[dict[str, Any]]:
     return out[:60]
 
 
+def _unwrap(result: dict[str, Any]) -> dict[str, Any]:
+    """Whisparr v3 wraps lookup hits as {foreignId, movie: {...}, id: <rank>};
+    the rank is not a library id. Return the movie itself.
+
+    >>> _unwrap({"foreignId": "f", "id": 1, "movie": {"title": "T", "foreignId": "f"}})
+    {'title': 'T', 'foreignId': 'f'}
+    >>> _unwrap({"title": "Old shape", "id": 7})
+    {'title': 'Old shape', 'id': 7}
+    """
+    inner = result.get("movie")
+    return dict(inner) if isinstance(inner, dict) else dict(result)
+
+
+async def _whisparr_library_id(whisparr: Any, foreign_id: str) -> Optional[int]:
+    """The Whisparr item id of a scene/movie already in the library, if any."""
+    found = await whisparr.item_by_stash_id(foreign_id)
+    if not found:
+        found = [m for m in await whisparr.movies() if str(m.get("foreignId")) == str(foreign_id)]
+    return int(found[0]["id"]) if found else None
+
+
 async def whisparr_lookup(svc: Services, term: str, item_type: Literal["scene", "movie"] = "scene") -> list[dict[str, Any]]:
-    """Find an adult scene or movie to ADD to Whisparr."""
+    """Find an adult scene or movie to ADD to Whisparr (StashDB ids work as the term)."""
     whisparr = svc.need_whisparr()
     results = await (whisparr.lookup_scenes(term) if item_type == "scene" else whisparr.lookup_movies(term))
-    return [
-        {
+    library = {str(m.get("foreignId")): m["id"] for m in await whisparr.movies()}
+    out = []
+    for raw in results[:10]:
+        r = _unwrap(raw)
+        foreign_id = str(r.get("foreignId") or raw.get("foreignId") or "")
+        movie_id = library.get(foreign_id)
+        out.append({
             "title": r.get("title"),
             "year": r.get("year"),
             "date": (r.get("releaseDate") or "")[:10] or None,
             "studio": r.get("studioTitle"),
-            "foreign_id": r.get("foreignId"),
+            "foreign_id": foreign_id,
             "item_type": r.get("itemType", item_type),
-            "in_library": bool(r.get("id")),
+            "in_library": movie_id is not None,
+            "movie_id": movie_id,
             "minutes": r.get("runtime"),
-        }
-        for r in results[:10]
-    ]
+        })
+    return out
 
 
 async def whisparr_add(
@@ -422,11 +448,14 @@ async def whisparr_add(
 ) -> dict[str, Any]:
     whisparr = svc.need_whisparr()
     lookup = await (whisparr.lookup_scenes(foreign_id) if item_type == "scene" else whisparr.lookup_movies(foreign_id))
-    item = next((r for r in lookup if str(r.get("foreignId")) == str(foreign_id)), lookup[0] if lookup else None)
-    if item is None:
+    raw = next((r for r in lookup if str(r.get("foreignId")) == str(foreign_id)), lookup[0] if lookup else None)
+    if raw is None:
         raise ServiceError("whisparr", f"nothing found for {foreign_id}")
-    if item.get("id"):
-        return {"already_in_library": True, "movie_id": item["id"], "title": item.get("title")}
+    item = _unwrap(raw)
+    item.pop("id", None)
+    existing = await _whisparr_library_id(whisparr, str(item.get("foreignId") or foreign_id))
+    if existing is not None:
+        return {"already_in_library": True, "movie_id": existing, "title": item.get("title"), "app": "whisparr"}
     profile_id, root = await _defaults(
         whisparr,
         quality_profile or svc.settings.WHISPARR_QUALITY_PROFILE,

@@ -42,6 +42,9 @@ without your approval.
   seeders, and checks episode coverage, packs that hide another show,
   executables and junk, and the bitrate a size implies. Then it picks one and
   says why.
+- **Pick from the ranking** — after judging, the chat shows the top releases
+  as a list with a Download button on each, and **Show more results** pages
+  through the rest of the search (quick-scored, or checked in depth on request).
 - **Pack surgery** — download only the files you need from a big pack and
   import them into the right series.
 - **Recommendations from your history** (Jellyfin, Trakt, AniList, Letterboxd)
@@ -65,6 +68,11 @@ without your approval.
   performers in your Whisparr library.
 - **Any model** — Anthropic, OpenAI, Google, OpenRouter, a local Ollama, or any
   OpenAI-compatible server.
+- **Proxy support** — the same proxy settings as Sonarr/Radarr/Prowlarr (HTTP
+  or SOCKS5, credentials, ignored addresses, bypass for local addresses). Metadata
+  lookups, the AI provider, tracker scrapes and Telegram go through it; your apps on
+  the LAN stay direct. While a proxy is on, UDP trackers are skipped so your IP
+  never reaches them.
 
 ## Screenshots
 

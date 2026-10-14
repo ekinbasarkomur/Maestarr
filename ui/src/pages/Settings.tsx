@@ -32,6 +32,7 @@ const TABS = [
   { id: 'services', label: 'Services' },
   { id: 'discovery', label: 'Discovery' },
   { id: 'telegram', label: 'Telegram' },
+  { id: 'proxy', label: 'Proxy' },
   { id: 'preferences', label: 'Download preferences' },
   { id: 'api', label: 'API & MCP' },
 ]
@@ -127,6 +128,11 @@ export default function SettingsPage() {
                 {tab === 'telegram' && (
                   <Section title="Telegram" subtitle={SERVICES.telegram.tagline}>
                     <TelegramForm sections={sections} onSaved={setSections} />
+                  </Section>
+                )}
+                {tab === 'proxy' && (
+                  <Section title="Proxy" subtitle={SERVICES.proxy.tagline}>
+                    <ServiceForm def={SERVICES.proxy} sections={sections} onSaved={setSections} />
                   </Section>
                 )}
                 {tab === 'preferences' && <PreferencesTab />}

@@ -15,7 +15,8 @@ import { PickCarousel } from '@/components/chat/PickCarousel'
 import {
   ApprovalCard,
   ToolActivity,
-  VerdictCard,
+  ReleasePicker,
+  type ReleaseList,
   type ToolPartView,
 } from '@/components/chat/ToolPart'
 import { Badge, Button, Logo, Spinner } from '@/components/ui/primitives'
@@ -495,11 +496,15 @@ function MessageRow({
             )
           }
           const output = p.output as Record<string, unknown> | undefined
-          if (view.name === 'judge_releases' && p.state === 'output-available' && output?.verdict) {
+          if (
+            (view.name === 'judge_releases' || view.name === 'more_releases') &&
+            p.state === 'output-available' &&
+            Array.isArray(output?.assessed)
+          ) {
             return (
               <div key={i} className="space-y-1.5">
                 <ToolActivity part={view} />
-                <VerdictCard data={output as never} />
+                <ReleasePicker data={output as unknown as ReleaseList} onAsk={onAsk} />
               </div>
             )
           }

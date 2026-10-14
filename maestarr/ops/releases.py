@@ -6,12 +6,14 @@ import asyncio
 import fnmatch
 import logging
 import time
+import uuid
 from typing import Any, Optional
 
 from maestarr.clients.base import ServiceError
 from maestarr.domain import JudgeResult, ReleaseAssessment, ReleaseCandidate
 from maestarr.judge.contents import parse_episode
-from maestarr.judge.judge import JudgeRequest, judge
+from maestarr.judge.judge import JudgeRequest, enrich, judge, prerank
+from maestarr.judge.score import score_assessment
 from maestarr.services import Services
 
 logger = logging.getLogger(__name__)
@@ -178,7 +180,56 @@ async def judge_releases(
         svc.assessments[a.candidate.guid] = a
     if result.verdict.chosen_guid and result.verdict.select_paths:
         svc.memo[f"selection:{result.verdict.chosen_guid}"] = list(result.verdict.select_paths)
-    return summarize(result)
+    out = summarize(result)
+    # Keep the rest of the search, best first, for "show more results".
+    judged = {a.candidate.guid for a in result.assessments}
+    hashes = {(a.candidate.info_hash or "").lower() for a in result.assessments} - {""}
+    rest = [
+        r for r in prerank(releases, svc.preferences())
+        if r.guid not in judged and (r.info_hash or "").lower() not in hashes
+    ]
+    results_id = uuid.uuid4().hex[:8]
+    svc.memo[f"results:{results_id}"] = {"request": request, "rest": rest, "at": time.time()}
+    out["results_id"] = results_id
+    out["more_available"] = len(rest)
+    return out
+
+
+async def more_releases(
+    svc: Services, results_id: str, *, offset: int = 0, limit: int = 8, deep: bool = False
+) -> dict[str, Any]:
+    """The next releases of a judged search, best first.
+
+    Quick by default (scored on what the indexer and the app report); `deep`
+    also reads their file lists and live seeders, like judge_releases.
+    """
+    entry = svc.memo.get(f"results:{results_id}")
+    if not entry or time.time() - entry["at"] > 1800:
+        raise ServiceError("maestarr", "those results expired — run judge_releases again")
+    request: JudgeRequest = entry["request"]
+    page = entry["rest"][offset : offset + max(1, min(limit, 20))]
+    prefs = svc.preferences()
+    if deep:
+        assessments = await enrich(request, page, svc.resolver, len(page))
+    else:
+        assessments = [ReleaseAssessment(candidate=c) for c in page]
+    for a in assessments:
+        earlier = list(a.reasons)
+        score_assessment(a, prefs, free_bytes=request.free_bytes, min_free_bytes=request.min_free_bytes,
+                         expected_units=request.expected_units)
+        a.reasons = earlier + a.reasons
+        svc.assessments[a.candidate.guid] = a
+    assessments.sort(key=lambda a: (not a.viable, -a.score))
+    next_offset = offset + len(page)
+    return {
+        "subject": request.subject,
+        "results_id": results_id,
+        "depth": "full" if deep else "quick",
+        "offset": offset,
+        "next_offset": next_offset,
+        "more_available": max(0, len(entry["rest"]) - next_offset),
+        "assessed": [_row(a) for a in assessments],
+    }
 
 
 def _matches(r: ReleaseCandidate, series_id: Optional[int], movie_id: Optional[int]) -> bool:
@@ -189,26 +240,29 @@ def _matches(r: ReleaseCandidate, series_id: Optional[int], movie_id: Optional[i
     return True
 
 
-def summarize(result: JudgeResult) -> dict[str, Any]:
-    def row(a: ReleaseAssessment) -> dict[str, Any]:
-        r = a.report
-        return {
-            "guid": a.candidate.guid,
-            "title": a.candidate.title,
-            "size_gb": a.candidate.size_gb,
-            "score": a.score,
-            "indexer_seeders": a.candidate.seeders,
-            "live_seeders": a.swarm.seeders if a.swarm else None,
-            "swarm_source": a.swarm.method if a.swarm else None,
-            "videos": r.video_files if r else None,
-            "coverage": f"{r.wanted_episodes_covered}/{r.wanted_episodes_total}" if r and r.wanted_episodes_total else None,
-            "avg_file_gb": r.avg_video_gb if r else None,
-            "bitrate_mbps": r.est_bitrate_mbps if r else None,
-            "notes": (r.notes if r else [])[:3],
-            "reasons": a.reasons[:6],
-            "blockers": a.blockers,
-        }
+def _row(a: ReleaseAssessment) -> dict[str, Any]:
+    r = a.report
+    return {
+        "guid": a.candidate.guid,
+        "title": a.candidate.title,
+        "size_gb": a.candidate.size_gb,
+        "score": a.score,
+        "indexer_seeders": a.candidate.seeders,
+        "live_seeders": a.swarm.seeders if a.swarm else None,
+        "swarm_source": a.swarm.method if a.swarm else None,
+        "videos": r.video_files if r else None,
+        "coverage": f"{r.wanted_episodes_covered}/{r.wanted_episodes_total}" if r and r.wanted_episodes_total else None,
+        "avg_file_gb": r.avg_video_gb if r else None,
+        "bitrate_mbps": r.est_bitrate_mbps if r else None,
+        "notes": (r.notes if r else [])[:3],
+        "reasons": a.reasons[:6],
+        "blockers": a.blockers,
+        "quality": a.candidate.quality,
+        "indexer": a.candidate.indexer,
+    }
 
+
+def summarize(result: JudgeResult) -> dict[str, Any]:
     v = result.verdict
     return {
         "subject": result.subject,
@@ -222,7 +276,7 @@ def summarize(result: JudgeResult) -> dict[str, Any]:
             "files_to_select": len(v.select_paths) or None,
             "select_paths": v.select_paths[:200],
         },
-        "assessed": [row(a) for a in result.assessments],
+        "assessed": [_row(a) for a in result.assessments],
     }
 
 

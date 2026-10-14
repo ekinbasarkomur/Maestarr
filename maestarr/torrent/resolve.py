@@ -18,7 +18,7 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional
 
 import httpx
 
@@ -155,6 +155,9 @@ class ReleaseResolver:
 
     async def _probe(self, info_hash: str, uri: str) -> TorrentContents:
         assert self.qbit is not None
+        if await self.qbit.torrent(info_hash):
+            # Already in the client (a real download): read it, never add or delete it.
+            return await self._from_client(info_hash, source="client")
         await self.qbit.add_probe(uri, category=self.probe_category, tag=PROBE_TAG)
         try:
             deadline = time.monotonic() + self.probe_timeout
@@ -166,7 +169,8 @@ class ReleaseResolver:
             raise asyncio.TimeoutError()
         finally:
             try:
-                await self.qbit.delete(info_hash, delete_files=True)
+                if is_probe(await self.qbit.torrent(info_hash), self.probe_category):
+                    await self.qbit.delete(info_hash, delete_files=True)
             except ServiceError as exc:  # pragma: no cover - best effort cleanup
                 logger.warning("could not remove probe %s: %s", info_hash, exc)
 
@@ -191,10 +195,33 @@ class ReleaseResolver:
         """Remove probes left behind by a crash. Returns how many were removed."""
         if not self.qbit:
             return 0
-        stale = await self.qbit.torrents(tag=PROBE_TAG)
+        tagged = await self.qbit.torrents(tag=PROBE_TAG)
+        stale = [t for t in tagged if is_probe(t, self.probe_category)]
+        adopted = [t for t in tagged if t not in stale]
         if stale:
             await self.qbit.delete(*[t["hash"] for t in stale], delete_files=True)
+        if adopted:
+            # An app grabbed the same torrent while it was being probed: it is a real
+            # download now. Drop the tag, never the data.
+            await self.qbit.remove_tags(PROBE_TAG, *[t["hash"] for t in adopted])
         return len(stale)
+
+
+def is_probe(torrent: Optional[dict[str, Any]], probe_category: str) -> bool:
+    """Only a torrent still in the probe category with nothing downloaded is a probe.
+
+    >>> is_probe({"category": "maestarr-probe", "downloaded": 0}, "maestarr-probe")
+    True
+    >>> is_probe({"category": "movies", "downloaded": 0}, "maestarr-probe")
+    False
+    >>> is_probe({"category": "maestarr-probe", "downloaded": 5_000_000}, "maestarr-probe")
+    False
+    >>> is_probe(None, "maestarr-probe")
+    False
+    """
+    if not torrent:
+        return False
+    return torrent.get("category") == probe_category and int(torrent.get("downloaded") or 0) < 1_000_000
 
 
 async def live_swarm(resolved: list[tuple[ReleaseCandidate, Resolved]]) -> dict[str, SwarmStats]:

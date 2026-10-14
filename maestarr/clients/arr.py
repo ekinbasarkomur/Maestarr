@@ -11,10 +11,13 @@ from typing import Any, Literal, Optional
 
 import httpx
 
-from maestarr.clients.base import HttpService
+from maestarr.clients.base import HttpService, ServiceError
 from maestarr.domain import ReleaseCandidate
 
 ImportMode = Literal["auto", "move", "copy"]
+
+
+RELEASE_SEARCH_TIMEOUT = 1800.0
 
 
 class ArrClient(HttpService):
@@ -91,11 +94,21 @@ class ArrClient(HttpService):
 
     async def releases(self, **params: Any) -> list[ReleaseCandidate]:
         # A season search fans out to every indexer (one query per episode for
-        # anime) and can take many minutes on a busy stack.
+        # anime) and the app then scores every release; on a busy host a movie
+        # with 150 releases took over 15 minutes.
         clean = {k: v for k, v in params.items() if v is not None}
-        response = await self.request(
-            "GET", "/api/v3/release", params=clean, timeout=httpx.Timeout(900.0, connect=10.0)
-        )
+        try:
+            response = await self.request(
+                "GET", "/api/v3/release", params=clean, timeout=httpx.Timeout(RELEASE_SEARCH_TIMEOUT, connect=10.0)
+            )
+        except ServiceError as exc:
+            if "timed out" in str(exc):
+                raise ServiceError(
+                    self.name,
+                    f"the release search took longer than {RELEASE_SEARCH_TIMEOUT / 60:.0f} minutes; "
+                    f"{self.name.capitalize()} is still working, try again in a few minutes",
+                ) from exc
+            raise
         raw = response.json() if response.content else []
         return [release_from_arr(self.app, item) for item in raw or []]
 

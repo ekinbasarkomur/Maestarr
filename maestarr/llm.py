@@ -102,6 +102,27 @@ def build_model_from(
     raise ModelNotConfigured(f"unknown provider {provider!r}")
 
 
+PROVIDER_HOSTS = {
+    "anthropic": "https://api.anthropic.com",
+    "openai": "https://api.openai.com",
+    "google": "https://generativelanguage.googleapis.com",
+    "openrouter": "https://openrouter.ai",
+}
+
+
+def proxied_http_client(provider: str, base_url: Optional[str]) -> Any:
+    """An httpx client through Settings → Proxy for this provider, or None (direct)."""
+    from maestarr import net
+
+    target = base_url or PROVIDER_HOSTS.get(provider) or ("http://localhost:11434" if provider == "ollama" else "")
+    proxy = net.proxy_for(target) if target else None
+    if not proxy:
+        return None
+    import httpx
+
+    return httpx.AsyncClient(proxy=proxy, timeout=httpx.Timeout(600.0, connect=10.0))
+
+
 def build_model(settings: Settings) -> Model:
     provider, name = split_model(settings)
     return build_model_from(
@@ -109,6 +130,7 @@ def build_model(settings: Settings) -> Model:
         name,
         api_key=secret(settings.MAESTARR_LLM_API_KEY),
         base_url=settings.MAESTARR_MODEL_BASE_URL,
+        http_client=proxied_http_client(provider, settings.MAESTARR_MODEL_BASE_URL),
     )
 
 

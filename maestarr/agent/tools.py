@@ -204,9 +204,35 @@ async def judge_releases(
         guids: Judge specific releases from an earlier search instead of searching again.
         app: Which app movie_id belongs to (radarr or whisparr).
     """
-    return await releases.judge_releases(
+    out = await releases.judge_releases(
         ctx.deps, series_id=series_id, season=season, episode=episode, movie_id=movie_id, guids=guids, app=app
     )
+    out["note"] = PICKER_NOTE
+    return out
+
+
+PICKER_NOTE = (
+    "The user sees these releases as a pick list with a Download button on each and a "
+    "'Show more results' option. Reply in one or two sentences (your pick and why); do not "
+    "list the releases or repeat their numbers. Grab only when the user picks one."
+)
+
+
+@tool()
+async def more_releases(ctx: Ctx, results_id: str, offset: int = 0, limit: int = 8, deep: bool = False) -> dict[str, Any]:
+    """The next releases of a search you already judged, best first — use when the user wants
+    more options ("show more results"). Quick scoring by default; deep=True also reads file
+    lists and live seeders (slower).
+
+    Args:
+        results_id: results_id from judge_releases (or the previous more_releases).
+        offset: Where to continue: next_offset from the previous call, 0 for the first page.
+        limit: How many releases (max 20).
+        deep: Inspect contents and live seeders too.
+    """
+    out = await releases.more_releases(ctx.deps, results_id, offset=offset, limit=limit, deep=deep)
+    out["note"] = PICKER_NOTE
+    return out
 
 
 @tool()

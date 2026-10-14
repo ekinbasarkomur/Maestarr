@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { type ComponentType, lazy, Suspense } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router'
 
 import { AppShell } from '@/components/AppShell'
@@ -7,12 +7,36 @@ import { useAuth } from '@/lib/auth-context'
 
 // One chunk per page: the login screen does not pay for the chat's markdown
 // and streaming code.
-const ChatPage = lazy(() => import('@/pages/Chat'))
-const DiscoverPage = lazy(() => import('@/pages/Discover'))
-const HomePage = lazy(() => import('@/pages/Home'))
-const LoginPage = lazy(() => import('@/pages/Login'))
-const SettingsPage = lazy(() => import('@/pages/Settings'))
-const SetupPage = lazy(() => import('@/pages/Setup'))
+/**
+ * A page chunk that fails to load usually means Maestarr was updated while this
+ * tab was open (the old chunk names are gone). Reload once to pick up the new
+ * build instead of showing a broken page.
+ */
+function lazyPage<T extends ComponentType>(load: () => Promise<{ default: T }>) {
+  const key = 'maestarr-reloaded'
+  return lazy(() =>
+    load()
+      .then((page) => {
+        sessionStorage.removeItem(key) // loaded fine: allow one reload next time
+        return page
+      })
+      .catch((error: unknown) => {
+        if (!sessionStorage.getItem(key)) {
+          sessionStorage.setItem(key, '1')
+          window.location.reload()
+          return new Promise<{ default: T }>(() => {})
+        }
+        throw error
+      }),
+  )
+}
+
+const ChatPage = lazyPage(() => import('@/pages/Chat'))
+const DiscoverPage = lazyPage(() => import('@/pages/Discover'))
+const HomePage = lazyPage(() => import('@/pages/Home'))
+const LoginPage = lazyPage(() => import('@/pages/Login'))
+const SettingsPage = lazyPage(() => import('@/pages/Settings'))
+const SetupPage = lazyPage(() => import('@/pages/Setup'))
 
 function PageFallback() {
   return (

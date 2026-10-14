@@ -165,8 +165,17 @@ async def scrape_many(
             if tracker.startswith(("udp://", "http://", "https://")):
                 per_tracker.setdefault(tracker, []).append(info_hash)
 
+    from maestarr import net
+
+    if not net.udp_allowed():
+        # A proxy cannot carry UDP; scraping directly would leak this host's IP.
+        per_tracker = {t: w for t, w in per_tracker.items() if not t.startswith("udp://")}
     results: dict[str, SwarmStats] = {h: SwarmStats(method="scrape") for h in hashes}
-    async with httpx.AsyncClient(follow_redirects=True) as client:
+    proxy = net.proxy_for("https://tracker.invalid")  # public trackers: proxied when a proxy is set
+    async with (
+        httpx.AsyncClient(follow_redirects=True, proxy=proxy) as proxied,
+        httpx.AsyncClient(follow_redirects=True) as direct,
+    ):
 
         async def one(tracker: str, wanted: list[str]) -> None:
             for h in wanted:
@@ -175,6 +184,7 @@ async def scrape_many(
                 if tracker.startswith("udp://"):
                     stats = await scrape_udp(tracker, wanted, timeout=timeout)
                 else:
+                    client = proxied if net.proxy_for(tracker) else direct
                     stats = await scrape_http(tracker, wanted, client, timeout=timeout + 2)
             except Exception as exc:  # noqa: BLE001 — one bad tracker is normal
                 logger.debug("scrape %s failed: %s", tracker, exc)

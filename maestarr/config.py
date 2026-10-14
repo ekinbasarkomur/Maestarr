@@ -69,6 +69,17 @@ class Settings(BaseSettings):
     RADARR_API_KEY: Optional[SecretStr] = None
     RADARR_QUALITY_PROFILE: Optional[str] = None
     RADARR_ROOT_FOLDER: Optional[str] = None
+    # Outbound proxy, like Sonarr/Radarr/Prowlarr's Settings → General → Proxy.
+    MAESTARR_PROXY_ENABLED: bool = False
+    MAESTARR_PROXY_TYPE: str = "http"  # http (also for https targets) or socks5
+    MAESTARR_PROXY_HOST: Optional[str] = None
+    MAESTARR_PROXY_PORT: Optional[int] = None
+    MAESTARR_PROXY_USERNAME: Optional[str] = None
+    MAESTARR_PROXY_PASSWORD: Optional[SecretStr] = None
+    MAESTARR_PROXY_BYPASS: Optional[str] = None  # comma-separated hosts or *.domain wildcards
+    MAESTARR_PROXY_BYPASS_LOCAL: bool = True
+    MAESTARR_PROXY_UDP_DIRECT: bool = False  # UDP tracker scrapes cannot use the proxy
+
     # Master switch for 18+ content: while off, Whisparr and StashDB are never contacted,
     # so no adult tools, library items or search results reach the assistant or the UI.
     MAESTARR_ADULT_CONTENT: bool = False

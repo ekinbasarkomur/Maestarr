@@ -206,11 +206,27 @@ def build_dispatcher(channel: TelegramChannel) -> Dispatcher:
     return dp
 
 
+def make_bot(token: str) -> Bot:
+    """A Bot that talks to Telegram through Settings → Proxy when one is set."""
+    from maestarr import net
+
+    proxy = net.proxy_for("https://api.telegram.org")
+    if not proxy:
+        return Bot(token)
+    from aiogram.client.session.aiohttp import AiohttpSession
+
+    try:
+        return Bot(token, session=AiohttpSession(proxy=proxy))
+    except Exception as exc:  # noqa: BLE001 — SOCKS needs aiohttp-socks; fall back to direct
+        logger.warning("telegram proxy unavailable (%s); connecting directly", exc)
+        return Bot(token)
+
+
 async def run_bot(svc: Services, store: Store) -> None:
     token = secret(svc.settings.TELEGRAM_BOT_TOKEN)
     if not token:
         raise RuntimeError("TELEGRAM_BOT_TOKEN is not set")
-    bot = Bot(token)
+    bot = make_bot(token)
     channel = TelegramChannel(svc, store, bot)
     dp = build_dispatcher(channel)
     logger.info("telegram bot polling (allowed chats: %s)", sorted(channel.allowed))

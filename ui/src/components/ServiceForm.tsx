@@ -204,6 +204,9 @@ export function ServiceForm({
               {typeof test.user === 'string' ? ` · ${test.user}` : ''}
               {typeof test.sample === 'string' ? ` · ${test.sample}` : ''}
               {typeof test.reply === 'string' ? ` · replied “${test.reply}”` : ''}
+              {typeof test.proxy_ip === 'string'
+                ? ` · leaves as ${test.proxy_ip}${typeof test.direct_ip === 'string' ? ` (direct: ${test.direct_ip})` : ''}`
+                : ''}
             </SuccessLine>
           ) : (
             <p className="flex items-start gap-1.5 text-danger">
@@ -236,6 +239,7 @@ export function ServiceForm({
 }
 
 function choiceOptions(field: FieldDef, test: TestResult | null): string[] {
+  if (field.options) return field.options.map(([value]) => value)
   if (!test?.ok || !field.from) return []
   if (field.from === 'root_folders') return (test.root_folders ?? []).map((r) => r.path)
   return (test[field.from] as string[] | undefined) ?? []
@@ -293,7 +297,7 @@ function FieldInput({
               : undefined
           return (
             <option key={o} value={o}>
-              {o}
+              {field.options?.find(([v]) => v === o)?.[1] ?? o}
               {free !== undefined ? `  ·  ${free} GB free` : ''}
             </option>
           )

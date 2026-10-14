@@ -42,6 +42,11 @@ SECTIONS: dict[str, list[str]] = {
     "adult": ["MAESTARR_ADULT_CONTENT"],
     "stashdb": ["STASHDB_ENABLED", "STASHDB_API_KEY"],
     "telegram": ["TELEGRAM_BOT_TOKEN", "TELEGRAM_ALLOWED_CHAT_IDS"],
+    "proxy": [
+        "MAESTARR_PROXY_ENABLED", "MAESTARR_PROXY_TYPE", "MAESTARR_PROXY_HOST", "MAESTARR_PROXY_PORT",
+        "MAESTARR_PROXY_USERNAME", "MAESTARR_PROXY_PASSWORD", "MAESTARR_PROXY_BYPASS",
+        "MAESTARR_PROXY_BYPASS_LOCAL", "MAESTARR_PROXY_UDP_DIRECT",
+    ],
     "behaviour": ["MAESTARR_ENRICH_TOP_N", "MAESTARR_PROBE_TIMEOUT", "MAESTARR_MIN_FREE_GB", "QBITTORRENT_PROBE_CATEGORY"],
 }
 EDITABLE = {f for fields in SECTIONS.values() for f in fields} | {"MAESTARR_SETUP_COMPLETE"}
@@ -199,6 +204,35 @@ async def _arr_test(client: Any, kind: str) -> dict[str, Any]:
     }
 
 
+async def _proxy_test(s: Settings) -> dict[str, Any]:
+    """Fetch the public IP through the proxy and directly, so the user sees it changes."""
+    import httpx
+
+    from maestarr import net
+
+    config = net.from_settings(s.model_copy(update={"MAESTARR_PROXY_ENABLED": True}))
+    if config is None:
+        raise ServiceError("proxy", "enter the proxy host and port")
+    if config.kind not in net.PROXY_TYPES:
+        raise ServiceError("proxy", "use HTTP or SOCKS5")
+
+    async def ip(proxy: Optional[str]) -> str:
+        async with httpx.AsyncClient(proxy=proxy, timeout=httpx.Timeout(20.0, connect=10.0)) as client:
+            response = await client.get("https://api.ipify.org", params={"format": "json"})
+            response.raise_for_status()
+            return str(response.json()["ip"])
+
+    try:
+        through = await ip(config.url)
+    except Exception as exc:  # noqa: BLE001 — report what the proxy said
+        raise ServiceError("proxy", f"could not go through {config.host}:{config.port}: {exc}") from exc
+    try:
+        direct = await ip(None)
+    except Exception:  # noqa: BLE001
+        direct = None
+    return {"proxy_ip": through, "direct_ip": direct, "changes_ip": direct is None or through != direct}
+
+
 async def run_test(service: str, s: Settings) -> dict[str, Any]:
     from maestarr.clients.anilist import AniListClient
     from maestarr.clients.arr import RadarrClient, SonarrClient, WhisparrClient
@@ -303,11 +337,13 @@ async def run_test(service: str, s: Settings) -> dict[str, Any]:
             return {"version": "ok"}
         finally:
             await client.aclose()
+    if service == "proxy":
+        return await _proxy_test(s)
     if service == "telegram":
         need(secret(s.TELEGRAM_BOT_TOKEN))
-        from aiogram import Bot
+        from maestarr.telegram.bot import make_bot
 
-        bot = Bot(secret(s.TELEGRAM_BOT_TOKEN) or "")
+        bot = make_bot(secret(s.TELEGRAM_BOT_TOKEN) or "")
         try:
             me = await bot.get_me()
             return {"version": "ok", "bot": f"@{me.username}"}
@@ -396,7 +432,7 @@ async def telegram_pair(body: TestRequest, _: Any = Depends(require_setup_open))
     """
     import time
 
-    from aiogram import Bot
+    from maestarr.telegram.bot import make_bot
 
     s = candidate_settings(body.fields)
     token = secret(s.TELEGRAM_BOT_TOKEN)
@@ -404,7 +440,7 @@ async def telegram_pair(body: TestRequest, _: Any = Depends(require_setup_open))
         return {"ok": False, "detail": "enter the bot token first"}
     if "pause" in bot_control:
         await bot_control["pause"]()
-    bot = Bot(token)
+    bot = make_bot(token)
     try:
         updates = await bot.get_updates(timeout=PAIR_WAIT, allowed_updates=["message"])
         msg = find_start(updates, time.time() - PAIR_MAX_AGE)

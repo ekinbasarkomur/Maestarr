@@ -196,6 +196,11 @@ class QBittorrentClient(HttpService):
             data={"hashes": "|".join(h.lower() for h in hashes), "deleteFiles": str(delete_files).lower()},
         )
 
+    async def remove_tags(self, tag: str, *hashes: str) -> None:
+        await self.request(
+            "POST", "/api/v2/torrents/removeTags", data={"hashes": "|".join(h.lower() for h in hashes), "tags": tag}
+        )
+
     async def stop(self, *hashes: str) -> None:
         await self._either("/api/v2/torrents/stop", "/api/v2/torrents/pause", hashes)
 

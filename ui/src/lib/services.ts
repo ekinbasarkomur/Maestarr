@@ -10,6 +10,8 @@ export interface FieldDef {
   hint?: string
   /** For `choice`: filled from the connection test result. */
   from?: 'quality_profiles' | 'root_folders' | 'users'
+  /** For `choice`: a fixed list of [value, label] pairs. */
+  options?: [string, string][]
   optional?: boolean
 }
 
@@ -227,6 +229,50 @@ export const SERVICES: Record<string, ServiceDef> = {
       },
     ],
   },
+}
+
+SERVICES.proxy = {
+  id: 'proxy',
+  title: 'Proxy',
+  tagline:
+    'Send Maestarr’s outbound traffic through a proxy, like Sonarr, Radarr and Prowlarr do: metadata, the AI provider, tracker scrapes and Telegram. Your *arr apps on the LAN stay direct.',
+  keyHint:
+    'Same fields as Sonarr/Radarr → Settings → General → Proxy. A VPN container such as Gluetun usually offers an HTTP proxy on port 8888 (publish it to reach it from Maestarr).',
+  fields: [
+    { name: 'MAESTARR_PROXY_ENABLED', label: 'Use a proxy', kind: 'toggle' },
+    {
+      name: 'MAESTARR_PROXY_TYPE',
+      label: 'Type',
+      kind: 'choice',
+      options: [
+        ['http', 'HTTP(S)'],
+        ['socks5', 'SOCKS5'],
+      ],
+    },
+    { name: 'MAESTARR_PROXY_HOST', label: 'Host', kind: 'text', placeholder: '127.0.0.1' },
+    { name: 'MAESTARR_PROXY_PORT', label: 'Port', kind: 'number', placeholder: '8888' },
+    { name: 'MAESTARR_PROXY_USERNAME', label: 'Username', kind: 'text', optional: true },
+    { name: 'MAESTARR_PROXY_PASSWORD', label: 'Password', kind: 'secret', optional: true },
+    {
+      name: 'MAESTARR_PROXY_BYPASS',
+      label: 'Ignored addresses',
+      kind: 'text',
+      optional: true,
+      placeholder: '*.example.lan, nas.mydomain.com',
+      hint: 'Comma-separated hosts that go direct; use * as a wildcard, like the *arr apps.',
+    },
+    {
+      name: 'MAESTARR_PROXY_BYPASS_LOCAL',
+      label: 'Bypass proxy for local addresses',
+      kind: 'toggle',
+    },
+    {
+      name: 'MAESTARR_PROXY_UDP_DIRECT',
+      label: 'Scrape UDP trackers directly',
+      kind: 'toggle',
+      hint: 'A proxy cannot carry UDP. Off: UDP trackers are skipped while the proxy is on, so your IP never reaches them; seeders then come from the indexer.',
+    },
+  ],
 }
 
 export const SECTION_OF: Record<string, string> = Object.fromEntries(

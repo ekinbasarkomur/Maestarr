@@ -1,4 +1,13 @@
-import { AlertTriangle, Check, ChevronRight, Loader2, ShieldQuestion, X } from 'lucide-react'
+import {
+  AlertTriangle,
+  Check,
+  ChevronRight,
+  Download,
+  ListPlus,
+  Loader2,
+  ShieldQuestion,
+  X,
+} from 'lucide-react'
 import { useState } from 'react'
 
 import { Badge, Button } from '@/components/ui/primitives'
@@ -93,100 +102,198 @@ export function ApprovalCard({
   )
 }
 
-interface Verdict {
-  subject: string
-  decided_by: string
-  verdict: {
-    chosen_guid: string | null
-    rationale: string
-    confidence: string
-    warnings: string[]
-    files_to_select?: number | null
-  }
-  assessed: {
-    guid: string
-    title: string
-    size_gb: number
-    score: number
-    indexer_seeders: number | null
-    live_seeders: number | null
-    swarm_source: string | null
-    coverage: string | null
-    bitrate_mbps: number | null
-    blockers: string[]
-  }[]
+export interface ReleaseRow {
+  guid: string
+  title: string
+  size_gb: number
+  score: number
+  indexer_seeders: number | null
+  live_seeders: number | null
+  swarm_source: string | null
+  coverage: string | null
+  bitrate_mbps: number | null
+  reasons?: string[]
+  blockers: string[]
+  quality?: string | null
+  indexer?: string | null
 }
 
-export function VerdictCard({ data }: { data: Verdict }) {
-  const chosen = data.assessed.find((a) => a.guid === data.verdict.chosen_guid)
+export interface ReleaseList {
+  subject: string
+  decided_by?: string
+  verdict?: {
+    chosen_guid: string | null
+    runner_up_guid?: string | null
+    rationale: string
+    files_to_select?: number | null
+  }
+  assessed: ReleaseRow[]
+  results_id?: string
+  more_available?: number
+  next_offset?: number
+  offset?: number
+  depth?: 'quick' | 'full'
+}
+
+const SHOWN = 5
+
+/** Judged releases as a pick list: Download on each row, more results on demand. */
+export function ReleasePicker({
+  data,
+  onAsk,
+}: {
+  data: ReleaseList
+  onAsk: (prompt: string) => void
+}) {
+  const [all, setAll] = useState(false)
+  const [asked, setAsked] = useState<Set<string>>(new Set())
+  const verdict = data.verdict
+  const chosen = verdict?.chosen_guid ?? null
+  const rows = all ? data.assessed : data.assessed.slice(0, SHOWN)
+  const more = data.more_available ?? 0
+  const nextOffset = data.next_offset ?? 0
+  const ask = (key: string, prompt: string) => {
+    setAsked((s) => new Set(s).add(key))
+    onAsk(prompt)
+  }
   return (
     <div className="glass overflow-hidden rounded-xl">
       <div className="border-b border-white/[0.06] px-4 py-3">
-        <div className="flex items-center gap-2">
-          <p className="text-sm font-medium">{data.subject}</p>
-          <Badge tone={chosen ? 'success' : 'danger'}>
-            {chosen ? 'pick found' : 'nothing acceptable'}
-          </Badge>
-          <Badge>{data.decided_by === 'llm' ? 'AI verdict' : 'rules verdict'}</Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm font-medium">
+            {verdict ? data.subject : `More results · ${data.subject}`}
+          </p>
+          {verdict && (
+            <Badge tone={chosen ? 'success' : 'danger'}>
+              {chosen ? 'pick found' : 'nothing acceptable'}
+            </Badge>
+          )}
+          {verdict && <Badge>{data.decided_by === 'llm' ? 'AI verdict' : 'rules verdict'}</Badge>}
+          {data.depth && (
+            <Badge>{data.depth === 'quick' ? 'quick check' : 'files and seeders checked'}</Badge>
+          )}
         </div>
-        <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
-          {data.verdict.rationale}
-        </p>
+        {verdict?.rationale && (
+          <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+            {verdict.rationale}
+          </p>
+        )}
       </div>
-      <table className="w-full text-[12px]">
-        <thead className="text-muted-foreground">
-          <tr className="text-left">
-            <th className="px-4 py-2 font-medium">Release</th>
-            <th className="px-2 py-2 text-right font-medium">Size</th>
-            <th className="px-2 py-2 text-right font-medium">Seeders</th>
-            <th className="hidden px-2 py-2 text-right font-medium sm:table-cell">Coverage</th>
-            <th className="px-4 py-2 text-right font-medium">Score</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.assessed.slice(0, 6).map((a) => (
-            <tr
-              key={a.guid}
+      <ul>
+        {rows.map((r, i) => {
+          const isPick = r.guid === chosen
+          const isRunnerUp = r.guid === verdict?.runner_up_guid
+          const blocked = r.blockers.length > 0
+          const seeders = r.live_seeders ?? r.indexer_seeders ?? null
+          const meta = [
+            `${r.size_gb} GB`,
+            seeders !== null ? `${seeders} ${r.live_seeders !== null ? 'live ' : ''}seeders` : null,
+            r.bitrate_mbps ? `~${r.bitrate_mbps} Mbps` : null,
+            r.coverage ? `covers ${r.coverage}` : null,
+            r.quality,
+            r.indexer,
+          ].filter(Boolean)
+          const note = blocked ? r.blockers[0] : r.reasons?.find((x) => !/^\d+p \(/.test(x))
+          const done = asked.has(r.guid)
+          return (
+            <li
+              key={r.guid}
               className={cn(
-                'border-t border-white/[0.04]',
-                a.guid === data.verdict.chosen_guid && 'bg-primary/[0.07]',
+                'flex items-center gap-3 border-t border-white/[0.04] px-4 py-3 first:border-t-0',
+                isPick && 'bg-primary/[0.07]',
               )}
             >
-              <td className="max-w-0 px-4 py-2">
-                <p className="truncate" title={a.title}>
-                  {a.title}
-                </p>
-                {a.blockers.length > 0 && (
-                  <p className="truncate text-[11px] text-danger">{a.blockers[0]}</p>
+              <span
+                className={cn(
+                  'flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ring-1',
+                  isPick ? 'bg-primary text-primary-foreground ring-primary' : 'ring-white/15',
                 )}
-              </td>
-              <td className="px-2 py-2 text-right tabular-nums">{a.size_gb} GB</td>
-              <td className="px-2 py-2 text-right tabular-nums">
-                {a.live_seeders ?? '–'}
-                {a.swarm_source === 'scrape' &&
-                  a.indexer_seeders !== null &&
-                  a.indexer_seeders !== a.live_seeders && (
-                    <span className="text-muted-foreground"> / {a.indexer_seeders}</span>
-                  )}
-              </td>
-              <td className="hidden px-2 py-2 text-right tabular-nums sm:table-cell">
-                {a.coverage ?? '–'}
-              </td>
-              <td className="px-4 py-2 text-right tabular-nums">{Math.round(a.score)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <p className="border-t border-white/[0.04] px-4 py-2 text-[11px] text-muted-foreground">
-        Seeders are live tracker numbers
-        {data.assessed.some((a) => a.swarm_source === 'scrape')
-          ? ' (indexer claim after the slash)'
-          : ''}
-        .
-        {data.verdict.files_to_select
-          ? ` Only ${data.verdict.files_to_select} files of the pack would be downloaded.`
-          : ''}
-      </p>
+              >
+                {(data.offset ?? 0) + i + 1}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="truncate text-[13px] font-medium" title={r.title}>
+                    {r.title}
+                  </p>
+                  {isPick && <Badge tone="success">Recommended</Badge>}
+                  {isRunnerUp && <Badge>Runner-up</Badge>}
+                </div>
+                <p className="truncate text-[11px] text-muted-foreground">{meta.join(' · ')}</p>
+                {note && (
+                  <p
+                    className={cn(
+                      'truncate text-[11px]',
+                      blocked ? 'text-danger' : 'text-muted-foreground/80',
+                    )}
+                    title={note}
+                  >
+                    {note}
+                  </p>
+                )}
+              </div>
+              <span className="hidden w-9 text-right text-xs text-muted-foreground tabular-nums sm:block">
+                {Math.round(r.score)}
+              </span>
+              <Button
+                size="sm"
+                variant={done ? 'ghost' : isPick ? 'primary' : blocked ? 'ghost' : 'secondary'}
+                disabled={done}
+                onClick={() =>
+                  ask(r.guid, `Download "${r.title}" (guid ${r.guid}) for ${data.subject}.`)
+                }
+              >
+                {done ? <Check className="size-3.5" /> : <Download className="size-3.5" />}
+                {done ? 'Requested' : blocked ? 'Anyway' : 'Download'}
+              </Button>
+            </li>
+          )
+        })}
+      </ul>
+      <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.06] px-4 py-2.5">
+        {!all && data.assessed.length > SHOWN && (
+          <Button size="sm" variant="ghost" onClick={() => setAll(true)}>
+            Show all {data.assessed.length}
+          </Button>
+        )}
+        {data.results_id && more > 0 && (
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={asked.has('more')}
+            onClick={() =>
+              ask(
+                'more',
+                `Show more results for ${data.subject} (results ${data.results_id}, offset ${nextOffset}).`,
+              )
+            }
+          >
+            <ListPlus className="size-3.5" />
+            Show more results ({more})
+          </Button>
+        )}
+        {data.depth === 'quick' && data.results_id && (
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={asked.has('deep')}
+            onClick={() =>
+              ask(
+                'deep',
+                `Check these releases in depth (results ${data.results_id}, offset ${data.offset ?? 0}).`,
+              )
+            }
+          >
+            Check files and seeders
+          </Button>
+        )}
+        <p className="ml-auto text-[11px] text-muted-foreground">
+          {verdict?.files_to_select
+            ? `Only ${verdict.files_to_select} files of the pack would be downloaded. `
+            : ''}
+          Downloads ask for approval.
+        </p>
+      </div>
     </div>
   )
 }
