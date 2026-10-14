@@ -69,7 +69,11 @@ class Settings(BaseSettings):
     RADARR_API_KEY: Optional[SecretStr] = None
     RADARR_QUALITY_PROFILE: Optional[str] = None
     RADARR_ROOT_FOLDER: Optional[str] = None
-    # Whisparr v3 (adult). Its tools only appear when this is configured.
+    # Master switch for 18+ content: while off, Whisparr and StashDB are never contacted,
+    # so no adult tools, library items or search results reach the assistant or the UI.
+    MAESTARR_ADULT_CONTENT: bool = False
+
+    # Whisparr v3 (adult). Its tools only appear when this is configured and the switch is on.
     WHISPARR_URL: Optional[str] = None
     WHISPARR_API_KEY: Optional[SecretStr] = None
     WHISPARR_QUALITY_PROFILE: Optional[str] = None

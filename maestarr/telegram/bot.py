@@ -149,7 +149,8 @@ def build_dispatcher(channel: TelegramChannel) -> Dispatcher:
         if not channel.allowed_chat(message.chat.id):
             await message.answer(
                 f"Hi! This chat's id is {message.chat.id}.\n"
-                "Add it under Settings → Telegram → Allowed chat ids in Maestarr, then send /start again."
+                "To connect it, press Connect under Settings → Telegram in Maestarr and send /start again "
+                "(or add the id to Allowed chat ids yourself)."
             )
             return
         await message.answer(HELP)

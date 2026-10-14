@@ -9,7 +9,9 @@ merged over what is saved, so the UI can test before saving.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import secrets as pysecrets
+from collections import Counter
 from typing import Any, Awaitable, Callable, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -37,6 +39,7 @@ SECTIONS: dict[str, list[str]] = {
     "trakt": ["TRAKT_CLIENT_ID", "TRAKT_USERNAME"],
     "anilist": ["ANILIST_USERNAME"],
     "letterboxd": ["LETTERBOXD_EXPORT"],
+    "adult": ["MAESTARR_ADULT_CONTENT"],
     "stashdb": ["STASHDB_ENABLED", "STASHDB_API_KEY"],
     "telegram": ["TELEGRAM_BOT_TOKEN", "TELEGRAM_ALLOWED_CHAT_IDS"],
     "behaviour": ["MAESTARR_ENRICH_TOP_N", "MAESTARR_PROBE_TIMEOUT", "MAESTARR_MIN_FREE_GB", "QBITTORRENT_PROBE_CATEGORY"],
@@ -168,15 +171,31 @@ def candidate_settings(fields: dict[str, Any]) -> Settings:
     return Settings(**{k: v for k, v in merged.items() if v is not None})
 
 
+def _by_usage(names: list[Any], used: list[Any]) -> list[Any]:
+    """Most-used first, the app's own order breaking ties, so the form can pre-select index 0.
+
+    >>> _by_usage(["Any", "HD", "UHD"], ["UHD", "HD", "UHD"])
+    ['UHD', 'HD', 'Any']
+    """
+    counts = Counter(used)
+    return sorted(names, key=lambda n: -counts[n])
+
+
 async def _arr_test(client: Any, kind: str) -> dict[str, Any]:
     status = await client.system_status()
-    profiles, roots = await asyncio.gather(client.quality_profiles(), client.root_folders())
+    library = client.series() if kind == "sonarr" else client.movies()
+    profiles, roots, items = await asyncio.gather(client.quality_profiles(), client.root_folders(), library)
     if status.get("appName", "").lower() not in ("", kind):
         raise ServiceError(kind, f"that address is {status.get('appName')}, not {kind.capitalize()}")
+    profile_names = {p["id"]: p["name"] for p in profiles}
+    used_profiles = [profile_names.get(i.get("qualityProfileId")) for i in items]
+    used_roots = [(i.get("rootFolderPath") or "").rstrip("/") for i in items]
+    ordered_roots = _by_usage([r["path"].rstrip("/") for r in roots], used_roots)
+    free = {r["path"].rstrip("/"): round((r.get("freeSpace") or 0) / 1024**3) for r in roots}
     return {
         "version": status.get("version"),
-        "quality_profiles": [p["name"] for p in profiles],
-        "root_folders": [{"path": r["path"], "free_gb": round((r.get("freeSpace") or 0) / 1024**3)} for r in roots],
+        "quality_profiles": _by_usage([p["name"] for p in profiles], used_profiles),
+        "root_folders": [{"path": path, "free_gb": free[path]} for path in ordered_roots],
     }
 
 
@@ -346,3 +365,62 @@ async def test_service(service: str, body: TestRequest, _: Any = Depends(require
     except Exception as exc:  # noqa: BLE001 — report, never 500 on a test
         return {"ok": False, "detail": f"{type(exc).__name__}: {exc}"[:300]}
     return {"ok": True, **result}
+
+
+# --------------------------------------------------------------------------
+# Telegram pairing — wait for /start and hand back the chat id
+# --------------------------------------------------------------------------
+
+# Set by the app: pausing the running bot frees getUpdates for the pairing poll.
+bot_control: dict[str, Callable[[], Awaitable[None]]] = {}
+
+PAIR_WAIT = 20  # seconds per long poll; the UI keeps asking until it gets a chat
+PAIR_MAX_AGE = 600  # a /start older than this is from some earlier attempt
+
+
+def find_start(updates: list[Any], since: float) -> Optional[Any]:
+    """The newest recent /start message among `updates`, if any."""
+    for update in reversed(updates):
+        msg = update.message
+        if msg and (msg.text or "").startswith("/start") and msg.date.timestamp() >= since:
+            return msg
+    return None
+
+
+@router.post("/telegram/pair")
+async def telegram_pair(body: TestRequest, _: Any = Depends(require_setup_open)) -> dict[str, Any]:
+    """Long-poll the bot for a `/start` and return that chat's id.
+
+    The token may still be unsaved (taken from `fields`). The running bot, if any,
+    is paused for the poll, because Telegram allows one getUpdates consumer.
+    """
+    import time
+
+    from aiogram import Bot
+
+    s = candidate_settings(body.fields)
+    token = secret(s.TELEGRAM_BOT_TOKEN)
+    if not token:
+        return {"ok": False, "detail": "enter the bot token first"}
+    if "pause" in bot_control:
+        await bot_control["pause"]()
+    bot = Bot(token)
+    try:
+        updates = await bot.get_updates(timeout=PAIR_WAIT, allowed_updates=["message"])
+        msg = find_start(updates, time.time() - PAIR_MAX_AGE)
+        if updates:
+            # Acknowledge what was read so the bot does not answer it again.
+            await bot.get_updates(offset=updates[-1].update_id + 1, timeout=0)
+        if not msg:
+            return {"ok": True, "waiting": True}
+        chat = msg.chat
+        name = chat.username and f"@{chat.username}" or chat.title or chat.full_name or str(chat.id)
+        with contextlib.suppress(Exception):
+            await bot.send_message(chat.id, "Connected to Maestarr. You can close the setup page and talk to me here.")
+        return {"ok": True, "waiting": False, "chat_id": chat.id, "name": name}
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "detail": f"Telegram said: {exc}"[:300]}
+    finally:
+        await bot.session.close()
+        if "resume" in bot_control:
+            await bot_control["resume"]()

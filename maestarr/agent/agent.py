@@ -66,6 +66,11 @@ def _dynamic_instructions(ctx: RunContext[Services]) -> str:
         f"Today is {date.today().isoformat()}.",
         "Configured integrations: " + (", ".join(configured) or "none") + ".",
     ]
+    if not svc.settings.MAESTARR_ADULT_CONTENT:
+        lines.append(
+            "Adult content is switched off: never search for, suggest or discuss adult titles; if asked, "
+            "say it can be enabled under Settings → Discovery."
+        )
     if prefs.notes:
         lines.append(f"The user's standing preferences: {prefs.notes}")
     return "\n".join(lines)

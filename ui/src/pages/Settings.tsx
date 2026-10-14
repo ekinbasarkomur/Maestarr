@@ -2,9 +2,11 @@ import { Copy, KeyRound, RefreshCw, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { NavLink, useNavigate, useParams } from 'react-router'
 
+import { AdultSwitch } from '@/components/AdultSwitch'
 import { AiForm } from '@/components/AiForm'
 import { useStatus } from '@/hooks/useStatus'
 import { ServiceCard, ServiceForm } from '@/components/ServiceForm'
+import { TelegramForm } from '@/components/TelegramForm'
 import {
   Badge,
   Button,
@@ -112,6 +114,7 @@ export default function SettingsPage() {
                       onSaved={setSections}
                     />
                   ))}
+                {tab === 'discovery' && <AdultSwitch sections={sections} onSaved={setSections} />}
                 {tab === 'discovery' &&
                   ['tmdb', 'omdb', 'trakt', 'anilist', 'stashdb'].map((id) => (
                     <ServiceCard
@@ -123,11 +126,7 @@ export default function SettingsPage() {
                   ))}
                 {tab === 'telegram' && (
                   <Section title="Telegram" subtitle={SERVICES.telegram.tagline}>
-                    <ServiceForm
-                      def={SERVICES.telegram}
-                      sections={sections}
-                      onSaved={setSections}
-                    />
+                    <TelegramForm sections={sections} onSaved={setSections} />
                   </Section>
                 )}
                 {tab === 'preferences' && <PreferencesTab />}

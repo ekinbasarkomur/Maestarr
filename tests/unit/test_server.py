@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 
+from pydantic import SecretStr
+
 from maestarr.config import get_settings
 from maestarr.server import call, list_tool_defs
 from maestarr.services import Services
@@ -36,3 +38,24 @@ async def test_call_runs_a_tool_and_reports_unknown_ones():
     is_error, text = await call(svc, "no_such_tool", {})
     assert is_error and "unknown" in text
     await svc.aclose()
+
+
+async def test_adult_switch_gates_whisparr_and_stashdb():
+    base = get_settings().model_copy(
+        update={
+            "WHISPARR_URL": "http://whisparr:6969",
+            "WHISPARR_API_KEY": SecretStr("k"),
+            "STASHDB_ENABLED": True,
+            "STASHDB_API_KEY": SecretStr("k"),
+        }
+    )
+    off = Services.from_settings(base)
+    names = {t.name for t in await list_tool_defs(off)}
+    assert off.whisparr is None and off.stashdb is None
+    assert "whisparr_lookup" not in names and "adult_search" not in names
+    await off.aclose()
+
+    on = Services.from_settings(base.model_copy(update={"MAESTARR_ADULT_CONTENT": True}))
+    names = {t.name for t in await list_tool_defs(on)}
+    assert "whisparr_lookup" in names and "adult_search" in names
+    await on.aclose()

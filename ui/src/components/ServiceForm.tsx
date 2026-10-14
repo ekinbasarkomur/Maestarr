@@ -126,7 +126,9 @@ export function ServiceForm({
           for (const f of def.fields) {
             if (f.kind !== 'choice' || next[f.name] || f.optional) continue
             const options = choiceOptions(f, result)
-            if (options.length) next[f.name] = options[0]
+            // The server lists the most-used option first; anime fields prefer an anime one.
+            const anime = f.name.includes('ANIME') && options.find((o) => /anime/i.test(o))
+            if (options.length) next[f.name] = anime || options[0]
           }
           return next
         })

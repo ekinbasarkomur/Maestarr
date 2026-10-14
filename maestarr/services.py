@@ -77,7 +77,7 @@ class Services:
             if both(s.RADARR_URL, s.RADARR_API_KEY)
             else None,
             whisparr=WhisparrClient(s.WHISPARR_URL or "", secret(s.WHISPARR_API_KEY) or "")
-            if both(s.WHISPARR_URL, s.WHISPARR_API_KEY)
+            if s.MAESTARR_ADULT_CONTENT and both(s.WHISPARR_URL, s.WHISPARR_API_KEY)
             else None,
             prowlarr=ProwlarrClient(s.PROWLARR_URL or "", secret(s.PROWLARR_API_KEY) or "")
             if both(s.PROWLARR_URL, s.PROWLARR_API_KEY)
@@ -98,7 +98,7 @@ class Services:
             anilist=AniListClient(s.data_dir),
             trakt=TraktClient(secret(s.TRAKT_CLIENT_ID) or "") if secret(s.TRAKT_CLIENT_ID) else None,
             stashdb=StashDbClient(s.STASHDB_URL, secret(s.STASHDB_API_KEY) or "")
-            if s.STASHDB_ENABLED and secret(s.STASHDB_API_KEY)
+            if s.MAESTARR_ADULT_CONTENT and s.STASHDB_ENABLED and secret(s.STASHDB_API_KEY)
             else None,
         )
 
@@ -115,6 +115,8 @@ class Services:
         return self.radarr
 
     def need_whisparr(self) -> WhisparrClient:
+        if not self.settings.MAESTARR_ADULT_CONTENT:
+            raise ServiceError("whisparr", "adult content is switched off (Settings → Discovery)")
         if not self.whisparr:
             raise NotConfigured("whisparr", "WHISPARR_URL and WHISPARR_API_KEY")
         return self.whisparr

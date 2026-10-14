@@ -213,6 +213,8 @@ async def recommendations(
 
 
 async def adult_search(svc: Services, query: str, what: Literal["scenes", "performers"] = "scenes") -> list[dict[str, Any]]:
+    if not svc.settings.MAESTARR_ADULT_CONTENT:
+        raise ServiceError("stashdb", "adult content is switched off (Settings → Discovery)")
     if not svc.stashdb:
         raise ServiceError("stashdb", "disabled — set STASHDB_ENABLED=true and STASHDB_API_KEY")
     if what == "performers":

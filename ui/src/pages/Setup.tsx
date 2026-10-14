@@ -2,8 +2,10 @@ import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 
+import { AdultSwitch } from '@/components/AdultSwitch'
 import { AiForm } from '@/components/AiForm'
 import { ServiceCard, ServiceForm } from '@/components/ServiceForm'
+import { TelegramForm } from '@/components/TelegramForm'
 import {
   Button,
   Field,
@@ -45,6 +47,9 @@ export default function SetupPage() {
   }, [state?.has_account, state?.user])
 
   const index = STEPS.findIndex((s) => s.id === step)
+  // Furthest step reached, so the stepper can jump back to (and forward to) any visited step.
+  const [furthest, setFurthest] = useState(index)
+  if (index > furthest) setFurthest(index)
   const go = (delta: number) =>
     setStep(STEPS[Math.min(STEPS.length - 1, Math.max(1, index + delta))].id)
 
@@ -67,7 +72,7 @@ export default function SetupPage() {
           </div>
         </header>
         <div className="grid gap-6 lg:grid-cols-[240px_1fr]">
-          <Stepper current={index} />
+          <Stepper current={index} furthest={furthest} onPick={(i) => setStep(STEPS[i].id)} />
           <Panel className="p-6 sm:p-8">
             <div className="mb-6">
               <p className="text-xs font-medium tracking-wider text-primary uppercase">
@@ -100,7 +105,7 @@ export default function SetupPage() {
                   Back
                 </Button>
                 <Button variant="secondary" onClick={() => go(1)}>
-                  {step === 'ai' ? 'Next' : 'Skip / next'}
+                  {step === 'ai' ? 'Skip for now' : 'Skip / next'}
                   <ArrowRight className="size-4" />
                 </Button>
               </div>
@@ -115,30 +120,51 @@ export default function SetupPage() {
   )
 }
 
-function Stepper({ current }: { current: number }) {
+function Stepper({
+  current,
+  furthest,
+  onPick,
+}: {
+  current: number
+  furthest: number
+  onPick: (index: number) => void
+}) {
   return (
     <ol className="glass hidden h-fit rounded-2xl p-3 lg:block">
-      {STEPS.map((s, i) => (
-        <li
-          key={s.id}
-          className={cn(
-            'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition',
-            i === current ? 'bg-white/[0.06] text-foreground' : 'text-muted-foreground',
-          )}
-        >
-          <span
-            className={cn(
-              'flex size-6 items-center justify-center rounded-full text-[11px] font-semibold ring-1',
-              i < current && 'bg-primary text-primary-foreground ring-primary',
-              i === current && 'ring-primary text-primary',
-              i > current && 'ring-white/15',
-            )}
-          >
-            {i < current ? <Check className="size-3.5" /> : i + 1}
-          </span>
-          {s.title}
-        </li>
-      ))}
+      {STEPS.map((s, i) => {
+        // The account step is done once and cannot be revisited.
+        const reachable = i > 0 && i <= furthest && i !== current
+        return (
+          <li key={s.id}>
+            <button
+              type="button"
+              disabled={!reachable}
+              onClick={() => onPick(i)}
+              className={cn(
+                'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition',
+                i === current ? 'bg-white/[0.06] text-foreground' : 'text-muted-foreground',
+                reachable && 'cursor-pointer hover:bg-white/[0.04] hover:text-foreground',
+              )}
+            >
+              <span
+                className={cn(
+                  'flex size-6 items-center justify-center rounded-full text-[11px] font-semibold ring-1',
+                  i < current && 'bg-primary text-primary-foreground ring-primary',
+                  i === current && 'ring-primary text-primary',
+                  i > current && 'ring-white/15',
+                )}
+              >
+                {i < current || (i <= furthest && i !== current) ? (
+                  <Check className="size-3.5" />
+                ) : (
+                  i + 1
+                )}
+              </span>
+              {s.title}
+            </button>
+          </li>
+        )
+      })}
     </ol>
   )
 }
@@ -262,6 +288,7 @@ function StepBody({
             defaultOpen={i === 0}
           />
         ))}
+        <AdultSwitch sections={sections} onSaved={setSections} />
       </div>
     )
   }
@@ -277,11 +304,12 @@ function StepBody({
             defaultOpen={i === 0}
           />
         ))}
+        <AdultSwitch sections={sections} onSaved={setSections} />
       </div>
     )
   }
   if (step === 'telegram') {
-    return <ServiceForm def={SERVICES.telegram} sections={sections} onSaved={setSections} />
+    return <TelegramForm sections={sections} onSaved={setSections} />
   }
   return null
 }

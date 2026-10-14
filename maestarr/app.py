@@ -54,6 +54,10 @@ class BotSupervisor:
 
             self.task = asyncio.create_task(run_bot(get_services(), chat.get_store()), name="telegram-bot")
 
+    async def restart(self) -> None:
+        self.signature = None
+        await self.sync()
+
     async def stop(self) -> None:
         if self.task:
             self.task.cancel()
@@ -63,6 +67,7 @@ class BotSupervisor:
 
 
 bot = BotSupervisor()
+settings.bot_control.update(pause=bot.stop, resume=bot.restart)
 
 
 async def _after_settings_change() -> None:

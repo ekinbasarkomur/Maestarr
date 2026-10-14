@@ -70,6 +70,14 @@ export interface TestResult {
   [key: string]: unknown
 }
 
+export interface TelegramPairResult {
+  ok: boolean
+  waiting?: boolean
+  chat_id?: number
+  name?: string
+  detail?: string
+}
+
 export interface ServiceStatus {
   name: string
   configured: boolean
@@ -183,6 +191,8 @@ export const api = {
     send<SettingsResponse>('PUT', '/api/settings', { fields }),
   testService: (service: string, fields: Record<string, unknown>) =>
     send<TestResult>('POST', `/api/settings/test/${service}`, { fields }),
+  telegramPair: (fields: Record<string, unknown>) =>
+    send<TelegramPairResult>('POST', '/api/settings/telegram/pair', { fields }),
   completeSetup: () => send<{ setup_complete: boolean }>('POST', '/api/settings/complete-setup'),
   createApiToken: () => send<{ token: string }>('POST', '/api/settings/api-token'),
   deleteApiToken: () => send<{ deleted: boolean }>('DELETE', '/api/settings/api-token'),
