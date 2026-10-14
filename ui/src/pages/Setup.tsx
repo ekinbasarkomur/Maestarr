@@ -4,7 +4,15 @@ import { useNavigate } from 'react-router'
 
 import { AiForm } from '@/components/AiForm'
 import { ServiceCard, ServiceForm } from '@/components/ServiceForm'
-import { Button, Field, Input, Logo, Panel, Spinner } from '@/components/ui/primitives'
+import {
+  Button,
+  Field,
+  Input,
+  Logo,
+  Panel,
+  PasswordInput,
+  Spinner,
+} from '@/components/ui/primitives'
 import { api, type Sections } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 import { SERVICES } from '@/lib/services'
@@ -170,26 +178,14 @@ function AccountStep({ onDone }: { onDone: () => Promise<void> }) {
         />
       </Field>
       <Field label="Password" htmlFor="p" hint="At least 8 characters.">
-        <Input
-          id="p"
-          type="password"
-          autoComplete="new-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+        <PasswordInput id="p" autoComplete="new-password" value={password} onChange={setPassword} />
       </Field>
       <Field
         label="Confirm password"
         htmlFor="c"
         hint={mismatch ? 'Does not match yet.' : undefined}
       >
-        <Input
-          id="c"
-          type="password"
-          autoComplete="new-password"
-          value={confirm}
-          onChange={(e) => setConfirm(e.target.value)}
-        />
+        <PasswordInput id="c" autoComplete="new-password" value={confirm} onChange={setConfirm} />
       </Field>
       {error && <p className="text-sm text-danger">{error}</p>}
       <Button

@@ -12,12 +12,41 @@ import {
   SuccessLine,
   Toggle,
 } from '@/components/ui/primitives'
+import { UrlInput } from '@/components/UrlInput'
 import { api, isSecret, type Sections, type SettingValue, type TestResult } from '@/lib/api'
 import type { FieldDef, ServiceDef } from '@/lib/services'
 import { isConfigured } from '@/lib/settings-utils'
+import { joinUrl, parseUrl, type UrlParts } from '@/lib/url'
 import { cn } from '@/lib/utils'
 
 type Values = Record<string, string | boolean>
+
+function defaultPort(field: FieldDef): string {
+  const m = field.placeholder?.match(/:(\d+)/)
+  return m ? m[1] : ''
+}
+
+function placeholderHost(field: FieldDef): string {
+  try {
+    return field.placeholder ? new URL(field.placeholder).hostname : ''
+  } catch {
+    return ''
+  }
+}
+
+function initialParts(
+  def: ServiceDef,
+  saved: Record<string, SettingValue>,
+): Record<string, UrlParts> {
+  const out: Record<string, UrlParts> = {}
+  for (const f of def.fields)
+    if (f.kind === 'url')
+      out[f.name] = parseUrl(
+        typeof saved?.[f.name] === 'string' ? (saved[f.name] as string) : '',
+        defaultPort(f),
+      )
+  return out
+}
 
 function initialValues(def: ServiceDef, saved: Record<string, SettingValue>): Values {
   const out: Values = {}
@@ -73,6 +102,7 @@ export function ServiceForm({
 }) {
   const saved = useMemo(() => sections[def.id] ?? {}, [sections, def.id])
   const [values, setValues] = useState<Values>(() => initialValues(def, saved))
+  const [parts, setParts] = useState<Record<string, UrlParts>>(() => initialParts(def, saved))
   const [test, setTest] = useState<TestResult | null>(null)
   const [testing, setTesting] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -115,6 +145,7 @@ export function ServiceForm({
       const response = await api.saveSettings(toPayload(def, values, saved))
       onSaved(response.sections)
       setValues(initialValues(def, response.sections[def.id] ?? {}))
+      setParts(initialParts(def, response.sections[def.id] ?? {}))
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -132,16 +163,30 @@ export function ServiceForm({
         </p>
       )}
       <div className="grid gap-4 sm:grid-cols-2">
-        {def.fields.map((f) => (
-          <FieldInput
-            key={f.name}
-            field={f}
-            value={values[f.name]}
-            saved={saved[f.name]}
-            test={test}
-            onChange={(v) => set(f.name, v)}
-          />
-        ))}
+        {def.fields.map((f) =>
+          f.kind === 'url' ? (
+            <div key={f.name} className="sm:col-span-2">
+              <UrlInput
+                id={`f-${f.name}`}
+                parts={parts[f.name]}
+                hostPlaceholder={placeholderHost(f)}
+                onChange={(p) => {
+                  setParts((all) => ({ ...all, [f.name]: p }))
+                  set(f.name, joinUrl(p))
+                }}
+              />
+            </div>
+          ) : (
+            <FieldInput
+              key={f.name}
+              field={f}
+              value={values[f.name]}
+              saved={saved[f.name]}
+              test={test}
+              onChange={(v) => set(f.name, v)}
+            />
+          ),
+        )}
       </div>
       {test && (
         <div className="text-xs">

@@ -11,6 +11,7 @@ import {
   Field,
   Input,
   Panel,
+  PasswordInput,
   Select,
   Spinner,
   StatusDot,
@@ -221,22 +222,15 @@ function GeneralTab() {
       <Section title="Account" subtitle={`Signed in as ${state?.user?.username}`}>
         <form onSubmit={change} className="grid max-w-lg gap-4 sm:grid-cols-2">
           <Field label="Current password" htmlFor="cp">
-            <Input
+            <PasswordInput
               id="cp"
-              type="password"
               autoComplete="current-password"
               value={current}
-              onChange={(e) => setCurrent(e.target.value)}
+              onChange={setCurrent}
             />
           </Field>
           <Field label="New password" htmlFor="np" hint="At least 8 characters.">
-            <Input
-              id="np"
-              type="password"
-              autoComplete="new-password"
-              value={next}
-              onChange={(e) => setNext(e.target.value)}
-            />
+            <PasswordInput id="np" autoComplete="new-password" value={next} onChange={setNext} />
           </Field>
           <div className="sm:col-span-2">
             <Button type="submit" loading={busy} disabled={!current || next.length < 8}>

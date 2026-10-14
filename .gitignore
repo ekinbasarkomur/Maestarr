@@ -33,3 +33,7 @@ ui/dist/
 
 # Built web UI (produced by `npm run build` in ui/ and by the Docker build)
 maestarr/web/
+
+# Local compose overrides (per machine)
+compose.override.yml
+data-dev/

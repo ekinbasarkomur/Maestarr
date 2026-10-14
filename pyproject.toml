@@ -12,6 +12,9 @@ dependencies = [
     # The agent: model providers, tools with approvals, the Vercel AI SDK
     # stream adapter (ui) and MCP client support.
     "pydantic-ai-slim[anthropic,openai,google,openrouter,mcp,ui]==2.13.0",
+    # anthropic 1.x moved to httpx2 and breaks pydantic-ai 2.13's provider
+    # ("Invalid `http_client` argument"); pydantic-ai only sets a lower bound.
+    "anthropic>=0.108,<1",
     # MCP server side (low-level server + streamable HTTP).
     "mcp>=2.3",
     "fastapi>=0.135",

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { Button, Field, Input, Logo, Panel } from '@/components/ui/primitives'
+import { Button, Field, Input, Logo, Panel, PasswordInput } from '@/components/ui/primitives'
 import { api } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
 
@@ -48,12 +48,11 @@ export default function LoginPage() {
             />
           </Field>
           <Field label="Password" htmlFor="p">
-            <Input
+            <PasswordInput
               id="p"
-              type="password"
               autoComplete="current-password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={setPassword}
             />
           </Field>
           {error && <p className="text-sm text-danger">{error}</p>}

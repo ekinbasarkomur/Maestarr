@@ -118,8 +118,37 @@ class _McpEndpoint:
 # --------------------------------------------------------------------------
 
 
+def _warm_imports() -> None:
+    """Import the heavy model/provider modules before serving.
+
+    They are otherwise imported lazily by the first chat or connection test,
+    and an import is synchronous: on a slow disk it would freeze the event
+    loop (and every other request) for as long as it takes.
+    """
+    import importlib
+
+    for name in (
+        "pydantic_ai",
+        "pydantic_ai.ui.vercel_ai",
+        "pydantic_ai.models.anthropic",
+        "pydantic_ai.models.openai",
+        "pydantic_ai.models.google",
+        "pydantic_ai.providers.anthropic",
+        "pydantic_ai.providers.openai",
+        "pydantic_ai.providers.google",
+        "pydantic_ai.providers.openrouter",
+        "aiogram",
+        "maestarr.agent.agent",
+    ):
+        try:
+            importlib.import_module(name)
+        except Exception as exc:  # noqa: BLE001 — an optional provider may be missing
+            logger.debug("warm import %s failed: %s", name, exc)
+
+
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    _warm_imports()
     get_config_store()  # create the database early
     svc = get_services()
     try:
