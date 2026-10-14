@@ -7,6 +7,12 @@ change behaviour.
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-15
+
+### Added
+- The details popup opens from the home page too: "Picks for tonight" and
+  "Recently added" (where it offers to find a better release).
+
 ## [0.2.1] - 2026-10-15
 
 ### Added
@@ -53,6 +59,7 @@ The first public release.
 - Long release searches are allowed up to 30 minutes, with a clear message.
 - A chat that contained a "thinking" reply no longer fails on the next message.
 
-[Unreleased]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/ekinbasarkomur/Maestarr/releases/tag/v0.2.0

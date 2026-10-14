@@ -125,6 +125,8 @@ export interface Overview {
     title: string
     year?: number
     poster?: string | null
+    tmdb_id?: number | null
+    tvdb_id?: number | null
   }[]
 }
 

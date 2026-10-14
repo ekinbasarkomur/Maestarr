@@ -105,11 +105,13 @@ async def _build_overview(svc: Any) -> dict[str, Any]:
         "queue": queue[:8],
         "recently_watched": history,
         "recently_added": [
-            {"kind": "series", "id": s["id"], "title": s["title"], "year": s.get("year"), "poster": _poster(s.get("images", []))}
+            {"kind": "anime" if s.get("seriesType") == "anime" else "series", "id": s["id"], "title": s["title"],
+             "year": s.get("year"), "poster": _poster(s.get("images", [])), "tvdb_id": s.get("tvdbId"), "tmdb_id": s.get("tmdbId")}
             for s in recent_series
         ]
         + [
-            {"kind": "movie", "id": m["id"], "title": m["title"], "year": m.get("year"), "poster": _poster(m.get("images", []))}
+            {"kind": "movie", "id": m["id"], "title": m["title"], "year": m.get("year"),
+             "poster": _poster(m.get("images", [])), "tmdb_id": m.get("tmdbId")}
             for m in recent_movies
         ],
     }

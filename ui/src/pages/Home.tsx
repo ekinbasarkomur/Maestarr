@@ -2,10 +2,12 @@ import { ArrowRight, HardDrive, Loader2, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 
+import { DetailsModal, type DetailsTarget } from '@/components/DetailsModal'
 import { MediaTile } from '@/components/MediaCard'
 import { Badge, Button, Panel } from '@/components/ui/primitives'
 import { api, type Overview, type Recommendations } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
+import { detailsToCard, searchPrompt } from '@/lib/picks'
 import { cn } from '@/lib/utils'
 
 const SUGGESTIONS = [
@@ -31,6 +33,7 @@ export default function HomePage() {
   const [picks, setPicks] = useState<Recommendations | null>(null)
   const [picksError, setPicksError] = useState<string | null>(null)
   const [prompt, setPrompt] = useState('')
+  const [details, setDetails] = useState<DetailsTarget | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -62,6 +65,18 @@ export default function HomePage() {
 
   return (
     <div className="scroll-thin h-full overflow-y-auto">
+      {details && (
+        <DetailsModal
+          target={details}
+          onClose={() => setDetails(null)}
+          onGet={(d) => ask(searchPrompt(detailsToCard(d)))}
+          onAsk={(d) =>
+            ask(
+              `Tell me more about ${d.title}${d.year ? ` (${d.year})` : ''} — is it right for me?`,
+            )
+          }
+        />
+      )}
       <div className="mx-auto max-w-6xl space-y-10 px-5 py-10 sm:px-8">
         <section className="space-y-5">
           <div>
@@ -228,9 +243,15 @@ export default function HomePage() {
                   rating={r.imdb_rating ?? r.rating}
                   inLibrary={r.in_library}
                   onClick={() =>
-                    ask(
-                      `Tell me about ${r.title} (${r.year ?? ''}, tmdb ${r.tmdb_id}) and whether I would like it.`,
-                    )
+                    setDetails({
+                      kind: (r.kind === 'tv' ? 'series' : r.kind) as DetailsTarget['kind'],
+                      tmdb_id: r.tmdb_id,
+                      tvdb_id: r.tvdb_id,
+                      title: r.title,
+                      year: r.year,
+                      poster: r.poster_url,
+                      why: r.why?.[0],
+                    })
                   }
                 />
               ))}
@@ -249,6 +270,17 @@ export default function HomePage() {
                   year={m.year}
                   poster={m.poster}
                   kind={m.kind}
+                  inLibrary
+                  onClick={() =>
+                    setDetails({
+                      kind: m.kind as DetailsTarget['kind'],
+                      tmdb_id: m.tmdb_id,
+                      tvdb_id: m.tvdb_id,
+                      title: m.title,
+                      year: m.year,
+                      poster: m.poster,
+                    })
+                  }
                 />
               ))}
             </div>
