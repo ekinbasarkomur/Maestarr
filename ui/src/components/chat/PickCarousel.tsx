@@ -8,9 +8,11 @@ import { cn } from '@/lib/utils'
 export function PickCarousel({
   cards,
   onSearch,
+  onOpen,
 }: {
   cards: PickCard[]
   onSearch: (card: PickCard) => void
+  onOpen?: (card: PickCard) => void
 }) {
   const row = useRef<HTMLDivElement>(null)
   const scroll = (dir: number) =>
@@ -27,6 +29,7 @@ export function PickCarousel({
             key={`${c.kind}-${c.tmdb_id ?? c.tvdb_id ?? c.stash_id ?? c.title}-${i}`}
             card={c}
             onSearch={onSearch}
+            onOpen={onOpen}
           />
         ))}
       </div>
@@ -60,11 +63,13 @@ function Arrow({ side, onClick }: { side: 'left' | 'right'; onClick: () => void 
 export function PickCardView({
   card: c,
   onSearch,
+  onOpen,
   className,
   label = 'Search',
 }: {
   card: PickCard
   onSearch: (c: PickCard) => void
+  onOpen?: (c: PickCard) => void
   className?: string
   label?: string
 }) {
@@ -86,7 +91,11 @@ export function PickCardView({
         className={cn(
           'relative overflow-hidden bg-white/[0.04]',
           scene ? 'aspect-video' : 'aspect-[2/3]',
+          onOpen && 'cursor-pointer transition hover:brightness-110',
         )}
+        onClick={onOpen ? () => onOpen(c) : undefined}
+        role={onOpen ? 'button' : undefined}
+        aria-label={onOpen ? `Details for ${c.title}` : undefined}
       >
         {c.image && !broken ? (
           <img
@@ -119,7 +128,15 @@ export function PickCardView({
       </div>
       <div className="flex flex-1 flex-col gap-2 p-3.5">
         <div>
-          <h3 className="line-clamp-2 text-sm leading-snug font-semibold">{c.title}</h3>
+          <h3
+            className={cn(
+              'line-clamp-2 text-sm leading-snug font-semibold',
+              onOpen && 'cursor-pointer hover:underline',
+            )}
+            onClick={onOpen ? () => onOpen(c) : undefined}
+          >
+            {c.title}
+          </h3>
           <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
             {meta.filter(Boolean).join(' · ')}
           </p>

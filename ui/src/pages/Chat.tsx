@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router'
 
 import { Markdown } from '@/components/chat/Markdown'
+import { DetailsModal, type DetailsTarget } from '@/components/DetailsModal'
 import { PickCarousel } from '@/components/chat/PickCarousel'
 import {
   ApprovalCard,
@@ -21,7 +22,7 @@ import {
 } from '@/components/chat/ToolPart'
 import { Badge, Button, Logo, Spinner } from '@/components/ui/primitives'
 import { api, type Conversation } from '@/lib/api'
-import { type PickCard, searchPrompt } from '@/lib/picks'
+import { detailsToCard, type PickCard, searchPrompt } from '@/lib/picks'
 import { cn } from '@/lib/utils'
 
 function newId() {
@@ -305,8 +306,25 @@ function ChatView({
 
   const errorText = error ? describeError(error) : null
 
+  const [details, setDetails] = useState<DetailsTarget | null>(null)
   return (
     <>
+      {details && (
+        <DetailsModal
+          target={details}
+          onClose={() => setDetails(null)}
+          onGet={(d) => {
+            setDetails(null)
+            send(searchPrompt(detailsToCard(d)))
+          }}
+          onAsk={(d) => {
+            setDetails(null)
+            send(
+              `Tell me more about ${d.title}${d.year ? ` (${d.year})` : ''} — is it right for me?`,
+            )
+          }}
+        />
+      )}
       <div ref={scroller} className="scroll-thin flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl px-4 pt-14 pb-6 sm:px-6 lg:pt-8">
           {messages.length === 0 ? (
@@ -322,6 +340,18 @@ function ChatView({
                     addToolApprovalResponse({ id: approvalId, approved })
                   }
                   onAsk={send}
+                  onOpen={(c) =>
+                    setDetails({
+                      kind: c.kind,
+                      tmdb_id: c.tmdb_id,
+                      tvdb_id: c.tvdb_id,
+                      stash_id: c.stash_id,
+                      title: c.title,
+                      year: c.year,
+                      poster: c.image,
+                      why: c.why,
+                    })
+                  }
                 />
               ))}
               {status === 'submitted' && (
@@ -442,11 +472,13 @@ function MessageRow({
   summaries,
   onApproval,
   onAsk,
+  onOpen,
 }: {
   message: UIMessage
   summaries: Record<string, string>
   onApproval: (approvalId: string, approved: boolean) => void
   onAsk: (text: string) => void
+  onOpen: (card: PickCard) => void
 }) {
   if (message.role === 'user') {
     const text = message.parts.map((p) => (p.type === 'text' ? p.text : '')).join('')
@@ -519,6 +551,7 @@ function MessageRow({
                 <PickCarousel
                   cards={output.cards as PickCard[]}
                   onSearch={(c) => onAsk(searchPrompt(c))}
+                  onOpen={onOpen}
                 />
               </div>
             )

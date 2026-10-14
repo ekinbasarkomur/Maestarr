@@ -153,6 +153,44 @@ export interface Recommendations {
   recommendations: MediaRef[]
 }
 
+export interface DetailsQuery {
+  kind: 'movie' | 'series' | 'anime' | 'scene'
+  tmdb_id?: number | null
+  tvdb_id?: number | null
+  stash_id?: string | null
+  title?: string | null
+  year?: number | null
+}
+
+export interface TitleDetails {
+  kind: DetailsQuery['kind']
+  title: string
+  year?: number | null
+  overview?: string | null
+  tagline?: string | null
+  runtime?: number | null
+  certification?: string | null
+  genres: string[]
+  tags: string[]
+  studio?: string | null
+  network?: string | null
+  director?: string | null
+  status?: string | null
+  seasons?: number | null
+  date?: string | null
+  ratings: { source: string; value: string }[]
+  trailer?: string | null
+  poster?: string | null
+  backdrop?: string | null
+  logo?: string | null
+  in_library?: boolean
+  cast: { name: string; role?: string | null; image?: string | null }[]
+  links?: { site?: string | null; url: string }[]
+  tmdb_id?: number | null
+  tvdb_id?: number | null
+  stash_id?: string | null
+}
+
 export interface AdultPicks {
   based_on: string[]
   scenes: import('./picks').PickCard[]
@@ -210,6 +248,14 @@ export const api = {
   recommendations: (kind: string, mood?: string) =>
     get<Recommendations>(
       `/api/recommendations?kind=${kind}${mood ? `&mood=${encodeURIComponent(mood)}` : ''}`,
+    ),
+  details: (params: DetailsQuery) =>
+    get<TitleDetails>(
+      `/api/details?${new URLSearchParams(
+        Object.entries(params)
+          .filter(([, v]) => v !== undefined && v !== null && v !== '')
+          .map(([k, v]) => [k, String(v)]),
+      )}`,
     ),
   adult: (query?: string) =>
     get<AdultPicks>(`/api/adult${query ? `?query=${encodeURIComponent(query)}` : ''}`),

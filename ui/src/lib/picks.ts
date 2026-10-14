@@ -29,3 +29,23 @@ export function searchPrompt(c: PickCard): string {
     return `Search releases for "${c.title}"${year}${c.tmdb_id ? `, tmdb ${c.tmdb_id}` : ''}: add it to Radarr if it is missing, then judge the releases.`
   return `Search releases for the ${c.kind} "${c.title}"${year}${c.tvdb_id ? `, tvdb ${c.tvdb_id}` : ''}: add it to Sonarr if it is missing, then judge the releases.`
 }
+
+/** A details popup's title as a card, so its Search button reuses searchPrompt. */
+export function detailsToCard(d: {
+  kind: PickCard['kind']
+  title: string
+  year?: number | null
+  tmdb_id?: number | null
+  tvdb_id?: number | null
+  stash_id?: string | null
+}): PickCard {
+  return {
+    kind: d.kind,
+    title: d.title,
+    year: d.year,
+    tmdb_id: d.tmdb_id,
+    tvdb_id: d.tvdb_id,
+    stash_id: d.stash_id,
+    why: '',
+  }
+}

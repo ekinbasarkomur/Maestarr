@@ -19,6 +19,7 @@ from maestarr.services import get_services
 router = APIRouter(prefix="/api", tags=["dashboard"])
 
 OVERVIEW_TTL = 20.0
+DETAILS_TTL = 3600.0  # lookups take ~20 s on a busy Sonarr/Radarr
 PART_DEADLINE = 90.0  # arr calls on a busy host
 HISTORY_DEADLINE = 10.0  # Jellyfin history fills its own cache in the background
 FIRST_LOAD_WAIT = 25.0
@@ -143,6 +144,34 @@ async def recommendations(
         return await recs(get_services(), kind=kind, mood=mood, limit=limit)  # type: ignore[arg-type]
     except ServiceError as exc:
         return JSONResponse({"detail": str(exc)}, status_code=503)
+
+
+@router.get("/details")
+async def title_details(
+    kind: str,
+    tmdb_id: Optional[int] = None,
+    tvdb_id: Optional[int] = None,
+    stash_id: Optional[str] = None,
+    title: Optional[str] = None,
+    year: Optional[int] = None,
+    _: Any = Depends(require_user),
+) -> Any:
+    from maestarr.ops.details import details
+
+    if kind not in ("movie", "series", "anime", "scene"):
+        return JSONResponse({"detail": "unknown kind"}, status_code=400)
+    svc = get_services()
+    key = f"details:{kind}:{tmdb_id}:{tvdb_id}:{stash_id}:{(title or '').lower()}:{year}"
+    cached = svc.memo.get(key)
+    if cached and time.monotonic() - cached[0] < DETAILS_TTL:
+        return cached[1]
+    try:
+        out = await details(svc, kind, tmdb_id=tmdb_id, tvdb_id=tvdb_id,  # type: ignore[arg-type]
+                            stash_id=stash_id, title=title, year=year)
+        svc.memo[key] = (time.monotonic(), out)
+        return out
+    except ServiceError as exc:
+        return JSONResponse({"detail": str(exc).split(": ", 1)[-1]}, status_code=503)
 
 
 @router.get("/adult")

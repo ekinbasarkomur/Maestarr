@@ -3,10 +3,11 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import { PickCardView } from '@/components/chat/PickCarousel'
+import { DetailsModal, type DetailsTarget } from '@/components/DetailsModal'
 import { MediaTile } from '@/components/MediaCard'
 import { Button, Input } from '@/components/ui/primitives'
 import { type AdultPicks, api, type Recommendations } from '@/lib/api'
-import { type PickCard, searchPrompt } from '@/lib/picks'
+import { detailsToCard, type PickCard, searchPrompt } from '@/lib/picks'
 import { cn } from '@/lib/utils'
 
 const KINDS = [
@@ -68,6 +69,7 @@ export default function DiscoverPage() {
   }, [kind, mood])
 
   const ask = (prompt: string) => navigate('/chat', { state: { prompt } })
+  const [details, setDetails] = useState<DetailsTarget | null>(null)
 
   return (
     <div className="scroll-thin h-full overflow-y-auto">
@@ -121,7 +123,32 @@ export default function DiscoverPage() {
           {loading && !adult && <Loader2 className="size-4 animate-spin text-muted-foreground" />}
         </div>
 
-        {adult && <AdultPanel onSearch={(c) => ask(searchPrompt(c))} />}
+        {adult && (
+          <AdultPanel
+            onSearch={(c) => ask(searchPrompt(c))}
+            onOpen={(c) =>
+              setDetails({
+                kind: 'scene',
+                stash_id: c.stash_id,
+                title: c.title,
+                poster: c.image,
+                why: c.why,
+              })
+            }
+          />
+        )}
+        {details && (
+          <DetailsModal
+            target={details}
+            onClose={() => setDetails(null)}
+            onGet={(d) => ask(searchPrompt(detailsToCard(d)))}
+            onAsk={(d) =>
+              ask(
+                `Tell me more about ${d.title}${d.year ? ` (${d.year})` : ''} — is it right for me?`,
+              )
+            }
+          />
+        )}
 
         {!adult && error && (
           <div className="glass rounded-2xl p-6 text-sm text-muted-foreground">
@@ -159,9 +186,15 @@ export default function DiscoverPage() {
                 rating={r.imdb_rating ?? r.rating}
                 inLibrary={r.in_library}
                 onClick={() =>
-                  ask(
-                    `Tell me about ${r.title} (${r.year ?? ''}, tmdb ${r.tmdb_id}) and why I'd like it.`,
-                  )
+                  setDetails({
+                    kind: (r.kind === 'tv' ? 'series' : r.kind) as DetailsTarget['kind'],
+                    tmdb_id: r.tmdb_id,
+                    tvdb_id: r.tvdb_id,
+                    title: r.title,
+                    year: r.year,
+                    poster: r.poster_url,
+                    why: r.why?.[0],
+                  })
                 }
                 footer={
                   <div className="mt-1.5 space-y-2">
@@ -210,7 +243,13 @@ export default function DiscoverPage() {
   )
 }
 
-function AdultPanel({ onSearch }: { onSearch: (c: PickCard) => void }) {
+function AdultPanel({
+  onSearch,
+  onOpen,
+}: {
+  onSearch: (c: PickCard) => void
+  onOpen: (c: PickCard) => void
+}) {
   const [draft, setDraft] = useState('')
   const [query, setQuery] = useState('')
   const [result, setResult] = useState<{ key: string; data?: AdultPicks; error?: string } | null>(
@@ -291,6 +330,7 @@ function AdultPanel({ onSearch }: { onSearch: (c: PickCard) => void }) {
               key={c.stash_id ?? c.title}
               card={{ ...c, why: c.why?.[0] ?? '' } as PickCard}
               onSearch={onSearch}
+              onOpen={onOpen}
               className="w-full"
               label="Get"
             />
