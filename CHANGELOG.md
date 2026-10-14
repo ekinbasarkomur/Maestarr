@@ -7,6 +7,13 @@ change behaviour.
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-10-15
+
+### Fixed
+- The chat no longer scrolls sideways: only recommendation rows, wide tables and
+  code blocks scroll horizontally.
+
+
 ## [0.4.1] - 2026-10-15
 
 ### Changed
@@ -91,7 +98,8 @@ The first public release.
 - Long release searches are allowed up to 30 minutes, with a clear message.
 - A chat that contained a "thinking" reply no longer fails on the next message.
 
-[Unreleased]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.2.2...v0.3.0

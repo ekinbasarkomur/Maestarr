@@ -357,7 +357,7 @@ function ChatView({
           }}
         />
       )}
-      <div ref={scroller} className="scroll-thin flex-1 overflow-y-auto">
+      <div ref={scroller} className="scroll-thin flex-1 overflow-x-hidden overflow-y-auto">
         <div className="mx-auto max-w-3xl px-4 pt-14 pb-6 sm:px-6 lg:pt-8">
           {messages.length === 0 ? (
             <EmptyState onPick={send} />

@@ -19,10 +19,10 @@ export function PickCarousel({
     row.current?.scrollBy({ left: dir * row.current.clientWidth * 0.8, behavior: 'smooth' })
   if (!cards.length) return null
   return (
-    <div className="group/row relative">
+    <div className="group/row relative min-w-0">
       <div
         ref={row}
-        className="scroll-thin -mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth px-1 pt-1 pb-3"
+        className="scroll-thin flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth pt-1 pb-3"
       >
         {cards.map((c, i) => (
           <PickCardView
@@ -52,7 +52,7 @@ function Arrow({ side, onClick }: { side: 'left' | 'right'; onClick: () => void 
       onClick={onClick}
       className={cn(
         'absolute top-[38%] hidden size-9 items-center justify-center rounded-full bg-black/70 text-foreground opacity-0 ring-1 ring-white/15 backdrop-blur transition group-hover/row:opacity-100 hover:bg-black/90 sm:flex',
-        side === 'left' ? '-left-3' : '-right-3',
+        side === 'left' ? 'left-1' : 'right-1',
       )}
     >
       <Icon className="size-5" />
