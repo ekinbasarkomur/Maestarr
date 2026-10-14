@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router'
 
 import { AdultSwitch } from '@/components/AdultSwitch'
 import { AiForm } from '@/components/AiForm'
+import { LanguagePicker } from '@/components/LanguagePicker'
 import { ServiceCard, ServiceForm } from '@/components/ServiceForm'
 import { TelegramForm } from '@/components/TelegramForm'
 import {
@@ -245,6 +246,7 @@ function StepBody({
           Maestarr needs a language model to chat, judge releases and pick recommendations. Use a
           cloud provider, or point it at your own Ollama.
         </p>
+        <LanguagePicker sections={sections} onSaved={setSections} />
         <AiForm
           sections={sections}
           saveLabel="Save and continue"

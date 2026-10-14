@@ -16,6 +16,8 @@ from pydantic_ai import Agent, DeferredToolRequests, RunContext
 from maestarr.agent.tools import toolset
 from maestarr.config import Settings, get_settings
 from maestarr.llm import ModelNotConfigured, build_model
+from maestarr.agent.channel import CHANNEL
+from maestarr.language import reply_language
 from maestarr.services import Services
 
 AgentOutput = Union[str, DeferredToolRequests]
@@ -75,14 +77,27 @@ def _dynamic_instructions(ctx: RunContext[Services]) -> str:
         if getattr(svc, name, None) is not None
     ]
     prefs = svc.preferences()
+    language = reply_language(svc.settings.MAESTARR_LANGUAGE)
     lines = [
         f"Today is {date.today().isoformat()}.",
+        (
+            f"Always write your replies in {language}, whatever language the user writes in — "
+            "including the `why` of recommendation cards and any explanation of releases. "
+            "Keep titles, release names and technical terms as they are."
+            if language
+            else "Reply in the language the user writes in."
+        ),
         "Configured integrations: " + (", ".join(configured) or "none") + ".",
     ]
     if not svc.settings.MAESTARR_ADULT_CONTENT:
         lines.append(
             "Adult content is switched off: never search for, suggest or discuss adult titles; if asked, "
             "say it can be enabled under Settings → Discovery."
+        )
+    if CHANNEL.get() == "telegram":
+        lines.append(
+            "You are replying in Telegram, which cannot show tables or headings: no Markdown tables, "
+            "no # headings. Use short paragraphs and bullet lists; **bold** only for titles."
         )
     if prefs.notes:
         lines.append(f"The user's standing preferences: {prefs.notes}")

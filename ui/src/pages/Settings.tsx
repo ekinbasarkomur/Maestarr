@@ -4,6 +4,7 @@ import { NavLink, useNavigate, useParams } from 'react-router'
 
 import { AdultSwitch } from '@/components/AdultSwitch'
 import { AiForm } from '@/components/AiForm'
+import { LanguagePicker } from '@/components/LanguagePicker'
 import { useStatus } from '@/hooks/useStatus'
 import { ServiceCard, ServiceForm } from '@/components/ServiceForm'
 import { TelegramForm } from '@/components/TelegramForm'
@@ -85,6 +86,11 @@ export default function SettingsPage() {
               <Spinner />
             ) : (
               <>
+                {tab === 'general' && (
+                  <Section title="Language" subtitle="The language Maestarr answers you in.">
+                    <LanguagePicker sections={sections} onSaved={setSections} />
+                  </Section>
+                )}
                 {tab === 'general' && <GeneralTab />}
                 {tab === 'ai' && (
                   <Section

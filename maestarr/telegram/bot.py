@@ -14,18 +14,23 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import html
 import logging
+import uuid
 from typing import Any, Optional
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.enums import ChatAction
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandStart
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from pydantic_ai import DeferredToolRequests, DeferredToolResults, ToolDenied
 
+from maestarr.agent.channel import CHANNEL
 from maestarr.config import secret
 from maestarr.services import Services
 from maestarr.store import Store, title_from
+from maestarr.telegram.format import to_plain, to_telegram_html
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +71,7 @@ class TelegramChannel:
         self.bot = bot
         self.allowed = set(svc.settings.TELEGRAM_ALLOWED_CHAT_IDS)
         self._locks: dict[int, asyncio.Lock] = {}
+        self._picks: dict[str, dict[str, Any]] = {}  # pick-list buttons → the releases they stand for
 
     def allowed_chat(self, chat_id: int) -> bool:
         return chat_id in self.allowed
@@ -91,6 +97,7 @@ class TelegramChannel:
 
         history = await self.store.messages(cid)
         typing = asyncio.create_task(self.typing(chat_id))
+        token = CHANNEL.set("telegram")
         try:
             result = await get_agent().run(
                 prompt, message_history=history or None, deferred_tool_results=results, deps=self.svc
@@ -100,14 +107,95 @@ class TelegramChannel:
             await self.bot.send_message(chat_id, f"Something went wrong: {exc}")
             return
         finally:
+            CHANNEL.reset(token)
             typing.cancel()
         await self.store.save_messages(cid, result.all_messages())
+        await self.send_extras(chat_id, result.new_messages())
         output = result.output
         if isinstance(output, DeferredToolRequests):
             await self.ask_approvals(chat_id, cid, output)
         else:
-            for part in chunks(str(output)):
-                await self.bot.send_message(chat_id, part)
+            await self.send_text(chat_id, str(output))
+
+    async def send_text(self, chat_id: int, text: str, **kwargs: Any) -> None:
+        """Markdown → Telegram HTML; plain text if Telegram rejects the markup."""
+        for part in chunks(text, 3500):
+            try:
+                await self.bot.send_message(chat_id, to_telegram_html(part), parse_mode="HTML",
+                                            disable_web_page_preview=True, **kwargs)
+            except TelegramBadRequest as exc:
+                logger.warning("telegram rejected HTML (%s); sending plain text", exc)
+                await self.bot.send_message(chat_id, to_plain(part), **kwargs)
+
+    async def send_extras(self, chat_id: int, messages: list[Any]) -> None:
+        """What the web chat shows as cards and pick lists, in Telegram's own form."""
+        for message in messages:
+            for part in getattr(message, "parts", []):
+                if getattr(part, "part_kind", "") != "tool-return" or not isinstance(part.content, dict):
+                    continue
+                try:
+                    if part.tool_name == "show_recommendations" and part.content.get("cards"):
+                        await self.send_cards(chat_id, part.content["cards"])
+                    elif part.tool_name in ("judge_releases", "more_releases") and part.content.get("assessed"):
+                        await self.send_picker(chat_id, part.content)
+                except Exception:  # noqa: BLE001 — extras must never lose the reply
+                    logger.exception("could not send %s to telegram", part.tool_name)
+
+    async def send_cards(self, chat_id: int, cards: list[dict[str, Any]]) -> None:
+        """Recommendations as a poster album; each caption carries the reason."""
+        from aiogram.types import InputMediaPhoto
+
+        def caption(c: dict[str, Any]) -> str:
+            head = f"<b>{html.escape(str(c.get('title')))}</b>" + (f" ({c['year']})" if c.get("year") else "")
+            rating = f" · ⭐ {c['rating']}" if c.get("rating") else ""
+            return f"{head}{rating}\n{html.escape(str(c.get('why') or ''))}"[:1000]
+
+        with_image = [c for c in cards if c.get("image")][:10]
+        if len(with_image) >= 2:
+            media = [InputMediaPhoto(media=c["image"], caption=caption(c), parse_mode="HTML") for c in with_image]
+            try:
+                await self.bot.send_media_group(chat_id, media=media)  # type: ignore[arg-type]
+                return
+            except TelegramBadRequest as exc:
+                logger.warning("poster album failed (%s); sending a list", exc)
+        elif len(with_image) == 1:
+            with contextlib.suppress(TelegramBadRequest):
+                await self.bot.send_photo(chat_id, with_image[0]["image"], caption=caption(with_image[0]), parse_mode="HTML")
+                return
+        await self.bot.send_message(chat_id, "\n\n".join(caption(c) for c in cards), parse_mode="HTML")
+
+    async def send_picker(self, chat_id: int, data: dict[str, Any]) -> None:
+        """Judged releases as a numbered list with a download button per release."""
+        rows = data["assessed"][:5]
+        chosen = (data.get("verdict") or {}).get("chosen_guid")
+        key = uuid.uuid4().hex[:10]
+        self._picks[key] = {"subject": data.get("subject"), "rows": rows, "results_id": data.get("results_id"),
+                            "next_offset": data.get("next_offset", 0)}
+        lines = [f"<b>{html.escape(str(data.get('subject')))}</b>"]
+        for i, r in enumerate(rows, start=1):
+            seeders = r.get("live_seeders") if r.get("live_seeders") is not None else r.get("indexer_seeders")
+            star = " ⭐" if r["guid"] == chosen else ""
+            lines.append(
+                f"\n<b>{i}.</b> {html.escape(r['title'][:90])}{star}\n"
+                f"    {r['size_gb']} GB · {seeders if seeders is not None else '?'} seeders · score {round(r['score'])}"
+                + (f"\n    <i>{html.escape(r['blockers'][0][:90])}</i>" if r.get("blockers") else "")
+            )
+        buttons = [InlineKeyboardButton(text=f"⬇️ {i}", callback_data=f"pk:{key}:{i - 1}") for i in range(1, len(rows) + 1)]
+        keyboard = [buttons]
+        if data.get("results_id") and data.get("more_available"):
+            keyboard.append([InlineKeyboardButton(text=f"➕ More results ({data['more_available']})", callback_data=f"pk:{key}:more")])
+        await self.bot.send_message(chat_id, "\n".join(lines), parse_mode="HTML",
+                                    reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
+
+    def pick_prompt(self, key: str, choice: str) -> Optional[str]:
+        entry = self._picks.get(key)
+        if not entry:
+            return None
+        if choice == "more":
+            return (f"Show more results for {entry['subject']} "
+                    f"(results {entry['results_id']}, offset {entry['next_offset']}).")
+        row = entry["rows"][int(choice)]
+        return f'Download "{row["title"]}" (guid {row["guid"]}) for {entry["subject"]}.'
 
     async def ask_approvals(self, chat_id: int, cid: str, requests: DeferredToolRequests) -> None:
         pending: dict[str, Any] = {"decisions": {}, "calls": []}
@@ -184,6 +272,23 @@ def build_dispatcher(channel: TelegramChannel) -> Dispatcher:
             if await channel.store.pending(cid):
                 await channel.store.set_pending(cid, None)  # a new message abandons open approvals
             await channel.run(chat_id, cid, prompt=message.text)
+
+    @dp.callback_query(F.data.startswith("pk:"))
+    async def pick(query: CallbackQuery) -> None:
+        chat_id = query.message.chat.id if query.message else query.from_user.id
+        if not channel.allowed_chat(chat_id):
+            await query.answer("Not allowed")
+            return
+        _, key, choice = (query.data or "::").split(":", 2)
+        prompt = channel.pick_prompt(key, choice)
+        if not prompt:
+            await query.answer("Those results expired — ask again")
+            return
+        await query.answer("On it")
+        async with channel.lock(chat_id):
+            cid = await channel.conversation(chat_id)
+            await channel.bot.send_message(chat_id, f"➡️ {prompt}")
+            await channel.run(chat_id, cid, prompt=prompt)
 
     @dp.callback_query(F.data.startswith("ap:"))
     async def approval(query: CallbackQuery) -> None:

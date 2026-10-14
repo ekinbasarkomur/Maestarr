@@ -35,12 +35,15 @@ STATUS_TIMEOUT = 10.0
 
 def metadata_client(s: Settings) -> Optional[TmdbClient]:
     """TMDB itself when a key is set, otherwise Seerr standing in for it."""
+    from maestarr.language import metadata_code
+
+    lang = metadata_code(s.MAESTARR_LANGUAGE)
     if secret(s.TMDB_API_KEY):
-        return TmdbClient(secret(s.TMDB_API_KEY) or "")
+        return TmdbClient(secret(s.TMDB_API_KEY) or "", language=lang)
     if s.SEERR_URL and secret(s.SEERR_API_KEY):
         from maestarr.clients.seerr import SeerrMetadataClient
 
-        return SeerrMetadataClient(s.SEERR_URL, secret(s.SEERR_API_KEY) or "")
+        return SeerrMetadataClient(s.SEERR_URL, secret(s.SEERR_API_KEY) or "", language=lang)
     return None
 
 

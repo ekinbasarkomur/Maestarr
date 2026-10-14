@@ -7,6 +7,19 @@ change behaviour.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-15
+
+### Added
+- **Reply language** (Settings → General, and in onboarding): pick any language and
+  Maestarr answers in it — in the web chat, on Telegram, in card reasons and in the
+  release judge's rationale. Titles and overviews come in that language too, where
+  TMDB has them. "Same as my message" follows whatever you write in.
+- **Telegram that looks like Telegram**: replies are sent as Telegram formatting
+  instead of raw Markdown, tables become bullet lists, recommendations arrive as a
+  poster album with the reason under each, and judged releases come as a numbered
+  list with a download button per release and "More results".
+
+
 ## [0.2.2] - 2026-10-15
 
 ### Added
@@ -59,7 +72,8 @@ The first public release.
 - Long release searches are allowed up to 30 minutes, with a clear message.
 - A chat that contained a "thinking" reply no longer fails on the next message.
 
-[Unreleased]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/ekinbasarkomur/Maestarr/releases/tag/v0.2.0

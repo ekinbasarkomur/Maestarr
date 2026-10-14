@@ -69,6 +69,10 @@ class Settings(BaseSettings):
     RADARR_API_KEY: Optional[SecretStr] = None
     RADARR_QUALITY_PROFILE: Optional[str] = None
     RADARR_ROOT_FOLDER: Optional[str] = None
+    # The language the assistant answers in ("auto" = the language the user writes in).
+    # Also used for metadata (titles, overviews) and the release judge's rationale.
+    MAESTARR_LANGUAGE: str = "auto"
+
     # Outbound proxy, like Sonarr/Radarr/Prowlarr's Settings → General → Proxy.
     MAESTARR_PROXY_ENABLED: bool = False
     MAESTARR_PROXY_TYPE: str = "http"  # http (also for https targets) or socks5

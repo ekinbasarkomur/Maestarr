@@ -54,6 +54,7 @@ class JudgeRequest:
     expected_units: int = 1
     free_bytes: Optional[int] = None
     min_free_bytes: int = 0
+    language: Optional[str] = None  # write the rationale in this language
 
 
 def prerank(candidates: Iterable[ReleaseCandidate], prefs: Preferences) -> list[ReleaseCandidate]:
@@ -184,7 +185,8 @@ def evidence_for_llm(assessments: list[ReleaseAssessment], prefs: Preferences, r
 async def llm_verdict(model: object, assessments: list[ReleaseAssessment], prefs: Preferences, request: JudgeRequest) -> JudgeVerdict:
     from pydantic_ai import Agent
 
-    agent: Agent[None, JudgeVerdict] = Agent(model, output_type=JudgeVerdict, instructions=JUDGE_INSTRUCTIONS)  # type: ignore[call-overload]
+    instructions = JUDGE_INSTRUCTIONS + (f"\nWrite the rationale and warnings in {request.language}." if request.language else "")
+    agent: Agent[None, JudgeVerdict] = Agent(model, output_type=JudgeVerdict, instructions=instructions)  # type: ignore[call-overload]
     result = await agent.run(evidence_for_llm(assessments, prefs, request))
     verdict = result.output
     known = {a.candidate.guid: a for a in assessments}

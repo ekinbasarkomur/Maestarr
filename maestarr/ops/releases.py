@@ -14,6 +14,7 @@ from maestarr.domain import JudgeResult, ReleaseAssessment, ReleaseCandidate
 from maestarr.judge.contents import parse_episode
 from maestarr.judge.judge import JudgeRequest, enrich, judge, prerank
 from maestarr.judge.score import score_assessment
+from maestarr.language import reply_language
 from maestarr.services import Services
 
 logger = logging.getLogger(__name__)
@@ -139,6 +140,7 @@ async def _context_for(svc: Services, releases: list[ReleaseCandidate], series_i
         expected_units=units,
         free_bytes=free,
         min_free_bytes=int(svc.settings.MAESTARR_MIN_FREE_GB * 1024**3),
+        language=reply_language(svc.settings.MAESTARR_LANGUAGE),
     )
 
 
