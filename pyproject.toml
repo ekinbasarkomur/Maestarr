@@ -1,23 +1,32 @@
 [project]
 name = "maestarr"
-version = "0.1.0"
+version = "0.2.0"
 description = "Maestarr — an AI maestro for your *arr stack: taste-aware recommendations, release judging with live swarm data, and chat control of Sonarr, Radarr, Prowlarr and qBittorrent"
 requires-python = ">=3.12"
 authors = [{ name = "Ekin Başar Kömür" }]
 dependencies = [
     "typer>=0.12",
     "python-dotenv>=1.0",
-    "pydantic>=2.0",
-    "pydantic-settings>=2.0",
-    "fastmcp>=3.3",
-    # >=0.135 for first-party SSE (fastapi.sse). See .claude/rules/async.md.
+    "pydantic>=2.12",
+    "pydantic-settings>=2.6",
+    # The agent: model providers, tools with approvals, the Vercel AI SDK
+    # stream adapter (ui) and MCP client support.
+    "pydantic-ai-slim[anthropic,openai,google,openrouter,mcp,ui]==2.13.0",
+    # MCP server side (low-level server + streamable HTTP).
+    "mcp>=2.3",
     "fastapi>=0.135",
-    "uvicorn>=0.29",
+    "uvicorn[standard]>=0.29",
+    "httpx>=0.27",
+    # Telegram channel.
+    "aiogram>=3.20",
+    # Conversation history (settings use the stdlib sqlite3).
+    "aiosqlite>=0.20",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
+    "respx>=0.21",
     "mypy>=1.0",
     "pytest-asyncio>=1.0",
     # AsyncClient + ASGITransport — FastAPI's TestClient cannot be used inside
@@ -34,6 +43,10 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["maestarr*"]
+
+[tool.setuptools.package-data]
+# The built web UI (ui/ → maestarr/web) ships inside the package.
+maestarr = ["web/*", "web/**/*"]
 
 [tool.pytest.ini_options]
 # The package itself is included so --doctest-modules reaches the docstring

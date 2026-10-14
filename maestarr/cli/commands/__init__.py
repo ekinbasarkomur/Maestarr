@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from maestarr.cli.commands import (  # noqa: F401
     doctor,
-    hello,
     serve,
     serve_mcp,
+    tools,
 )

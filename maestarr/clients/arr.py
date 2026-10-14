@@ -18,7 +18,7 @@ ImportMode = Literal["auto", "move", "copy"]
 
 
 class ArrClient(HttpService):
-    app: Literal["sonarr", "radarr"]
+    app: Literal["sonarr", "radarr", "whisparr"]
 
     def __init__(
         self,
@@ -60,7 +60,7 @@ class ArrClient(HttpService):
             "/api/v3/queue",
             pageSize=page_size,
             includeUnknownSeriesItems="true" if self.app == "sonarr" else None,
-            includeUnknownMovieItems="true" if self.app == "radarr" else None,
+            includeUnknownMovieItems="true" if self.app in ("radarr", "whisparr") else None,
         )
         return (data or {}).get("records", [])
 
@@ -90,7 +90,13 @@ class ArrClient(HttpService):
     # --- interactive search ----------------------------------------------
 
     async def releases(self, **params: Any) -> list[ReleaseCandidate]:
-        raw = await self.get_json("/api/v3/release", **params)
+        # A season search fans out to every indexer (one query per episode for
+        # anime) and can take many minutes on a busy stack.
+        clean = {k: v for k, v in params.items() if v is not None}
+        response = await self.request(
+            "GET", "/api/v3/release", params=clean, timeout=httpx.Timeout(900.0, connect=10.0)
+        )
+        raw = response.json() if response.content else []
         return [release_from_arr(self.app, item) for item in raw or []]
 
     async def grab(
@@ -231,7 +237,7 @@ class RadarrClient(ArrClient):
 # --------------------------------------------------------------------------
 
 
-def release_from_arr(app: Literal["sonarr", "radarr"], item: dict[str, Any]) -> ReleaseCandidate:
+def release_from_arr(app: Literal["sonarr", "radarr", "whisparr"], item: dict[str, Any]) -> ReleaseCandidate:
     """Normalise one `/api/v3/release` item.
 
     >>> r = release_from_arr("sonarr", {"guid": "g", "indexerId": 3, "title": "Show.S01.1080p",
@@ -281,3 +287,20 @@ def release_from_arr(app: Literal["sonarr", "radarr"], item: dict[str, Any]) -> 
         quality_raw=item.get("quality"),
         languages_raw=list(item.get("languages") or []),
     )
+
+
+class WhisparrClient(RadarrClient):
+    """Whisparr v3 (adult) — a Radarr fork; items are movies OR scenes
+    (`itemType`), keyed by StashDB/TPDB ids (`foreignId`, `stashId`)."""
+
+    name = "whisparr"
+    app = "whisparr"  # type: ignore[assignment]
+
+    async def lookup_scenes(self, term: str) -> list[dict[str, Any]]:
+        return await self.get_json("/api/v3/lookup/scene", term=term)
+
+    async def lookup_movies(self, term: str) -> list[dict[str, Any]]:
+        return await self.get_json("/api/v3/lookup/movie", term=term)
+
+    async def item_by_stash_id(self, stash_id: str) -> list[dict[str, Any]]:
+        return await self.get_json("/api/v3/movie", stashId=stash_id)

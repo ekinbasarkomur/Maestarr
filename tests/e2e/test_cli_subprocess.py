@@ -51,10 +51,14 @@ def _run(*args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def test_console_script_prints_greeting():
-    result = _run("hello")
+def test_console_script_runs_doctor_without_configuration(tmp_path):
+    # doctor must work on a fresh install: every integration "not configured".
+    result = subprocess.run(
+        [SCRIPT, "doctor"], capture_output=True, text=True, timeout=60,
+        env={"MAESTARR_DATA_DIR": str(tmp_path), "PATH": "/usr/bin:/bin"}, cwd=tmp_path,
+    )
     assert result.returncode == 0, result.stderr
-    assert "Hello, world!" in result.stdout
+    assert "sonarr" in result.stdout and "not configured" in result.stdout
 
 
 def test_console_script_reports_version():

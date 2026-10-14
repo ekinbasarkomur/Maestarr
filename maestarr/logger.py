@@ -116,6 +116,10 @@ def setup_logging(
         stream_handler.setFormatter(formatter)
         root.addHandler(stream_handler)
 
+    # Per-request INFO lines from the HTTP stack drown everything else.
+    for noisy in ("httpx", "httpcore", "aiogram.event"):
+        logging.getLogger(noisy).setLevel(max(level, logging.WARNING))
+
     _configured = True
     return root
 

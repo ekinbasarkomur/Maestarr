@@ -32,7 +32,9 @@ class QBittorrentClient(HttpService):
     ) -> None:
         headers = {"Referer": base_url.rstrip("/")}
         if host_header:
+            # qBittorrent's CSRF check compares Referer/Origin with Host.
             headers["Host"] = host_header
+            headers["Referer"] = f"http://{host_header}"
         super().__init__(base_url, headers=headers, transport=transport)
         self._username = username
         self._password = password
@@ -51,7 +53,9 @@ class QBittorrentClient(HttpService):
                 "/api/v2/auth/login",
                 data={"username": self._username, "password": self._password or ""},
             )
-            if response.text.strip() != "Ok.":
+            # qBittorrent < 5.2 answers "Ok."; 5.2+ answers 204 with an empty
+            # body. Only "Fails." (or no session cookie) means a bad login.
+            if response.text.strip() == "Fails." or "SID" not in self.client.cookies and not response.cookies:
                 raise ServiceError(self.name, "login failed (wrong credentials or IP banned)")
             self._logged_in = True
 
@@ -142,6 +146,38 @@ class QBittorrentClient(HttpService):
         text = response.text.strip()
         if text.startswith("Fails"):
             raise ServiceError(self.name, "torrent was rejected (duplicate or invalid)")
+
+    async def webapi_version(self) -> tuple[int, ...]:
+        text = (await self.request("GET", "/api/v2/app/webapiVersion")).text.strip()
+        return tuple(int(p) for p in text.split(".") if p.isdigit())
+
+    async def fetch_metadata(self, source: str) -> tuple[bool, dict[str, Any]]:
+        """qBittorrent >= 5.2: resolve a magnet/URL's metadata WITHOUT adding it.
+
+        Returns `(ready, payload)`; while metadata is still being fetched the
+        API answers 202 and `ready` is False — call again to poll.
+        """
+        response = await self.request("POST", "/api/v2/torrents/fetchMetadata", data={"source": source})
+        payload = response.json() if response.content else {}
+        return response.status_code == 200 and bool(payload.get("info")), payload
+
+    async def add_probe(self, magnet: str, *, category: str, tag: str) -> None:
+        """Older qBittorrent: add a magnet that stops itself once metadata arrives.
+
+        A torrent added *stopped* never fetches metadata, so it is added
+        running with `stopCondition=MetadataReceived` (qBittorrent pauses it the
+        moment metadata is in, before any piece is downloaded) and `forced` so
+        queue limits cannot park it.
+        """
+        data = {
+            "urls": magnet,
+            "category": category,
+            "tags": tag,
+            "stopCondition": "MetadataReceived",
+            "forced": "true",
+            "autoTMM": "false",
+        }
+        await self.request("POST", "/api/v2/torrents/add", data=data)
 
     async def set_file_priority(self, info_hash: str, file_ids: Sequence[int], priority: int) -> None:
         """priority: 0 = do not download, 1 = normal, 6 = high, 7 = maximal."""

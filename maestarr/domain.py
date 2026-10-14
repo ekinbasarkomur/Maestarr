@@ -32,7 +32,7 @@ class ReleaseCandidate(BaseModel):
     (`rejections`, `custom_format_score`) and add our own evidence on top.
     """
 
-    app: Literal["sonarr", "radarr", "prowlarr"]
+    app: Literal["sonarr", "radarr", "whisparr", "prowlarr"]
     guid: str
     indexer_id: int
     indexer: str = ""

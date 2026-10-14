@@ -8,6 +8,11 @@ disk — and explain why — before anything is downloaded.
 > 🚧 **Status: early development.** The architecture below is the plan the code
 > is being built towards; see [Roadmap](#roadmap) for what already works.
 
+> 🤖 **Vibecoded.** Maestarr is built largely by prompting an AI coding agent
+> (Claude Code) and reviewing what it writes, rather than typed line by line.
+> It has tests and is used on a real stack, but read the code before you trust
+> it with your library — and issues/PRs are very welcome.
+
 ```
 you ▸ recommend me something melancholic, I loved Lost in Translation
 maestarr ▸ Three picks from your history (you rewatch quiet, slow 2000s drama):
@@ -58,7 +63,8 @@ history, hardlinks and your quality profiles keep working exactly as before.
   Trakt, AniList and Letterboxd), TMDB metadata, IMDb ratings — filtered by
   mood ("melancholic", "cosy", "mind-bending"), language, length, decade.
 - **Library control**: add series/movies, search, check the queue, free space,
-  delete what you watched — all through Sonarr/Radarr.
+  delete what you watched — all through Sonarr/Radarr (and Whisparr v3 for
+  adult scenes/movies, when you configure it).
 - **Human in the loop**: anything that changes your stack (grab, add, delete,
   import) asks for approval first — in the web UI, in Telegram (inline
   buttons), and is flagged as destructive to MCP clients.
@@ -132,6 +138,7 @@ is optional; an unconfigured one is simply hidden from the agent.
 | `MAESTARR_API_TOKEN` | optional bearer token protecting the web UI and API |
 | `SONARR_URL`, `SONARR_API_KEY` | Sonarr |
 | `RADARR_URL`, `RADARR_API_KEY` | Radarr |
+| `WHISPARR_URL`, `WHISPARR_API_KEY` | Whisparr v3 (adult) — its tools only appear when set |
 | `PROWLARR_URL`, `PROWLARR_API_KEY` | Prowlarr (free-form searches) |
 | `QBITTORRENT_URL`, `QBITTORRENT_USERNAME`, `QBITTORRENT_PASSWORD` | qBittorrent Web UI |
 | `JELLYFIN_URL`, `JELLYFIN_API_KEY`, `JELLYFIN_USER` | watch history |
@@ -171,6 +178,27 @@ See [`.env.example`](.env.example) for the full list with defaults.
 - [ ] Telegram bot
 - [ ] MCP server
 - [ ] Docker image and release
+
+### Inside your media server
+
+Talking to Maestarr from the media server's own interface. Findings so far:
+
+| Server | Plugin possible? | Plan |
+| --- | --- | --- |
+| **Jellyfin** (10.11 / 12.x) | Partly — server plugins are official (C#/.NET); web-client UI only through community plugins ([Plugin Pages](https://github.com/IAmParadox27/jellyfin-plugin-pages), [File Transformation](https://github.com/IAmParadox27/jellyfin-plugin-file-transformation)) | A Jellyfin plugin with an authenticated streaming proxy to Maestarr's chat and a sidebar chat page; later "Get this" buttons on item pages. Built for both .NET 9 (10.11) and .NET 10 (12.x), distributed through a plugin repository manifest. |
+| **Emby** | Partly — plugins can add main/user-menu pages officially (`IHasWebPages`) | Port of the Jellyfin plugin if there is demand; the catalog is curated, so manual install first. |
+| **Plex** | **No** — Plex removed its plugin framework; Plex Web has no extension API | API + webhooks only: read history, push collections/playlists, react to "just watched". |
+
+Injected UI never reaches native TV/mobile apps (Android TV, Swiftfin, Roku,
+Tizen, Plex/Emby apps). What does reach every client:
+
+- [ ] **"Maestarr picks" collections/playlists** synced to Jellyfin, Emby and Plex
+- [ ] **Jellyfin plugin**: chat page in the web UI (proxy + Plugin Pages)
+- [ ] "Favourite it to get it": a placeholder picks library where favouriting a
+      title asks Maestarr to fetch it (works from any client)
+- [ ] Plex connector (history, collections, webhooks)
+- [ ] Emby plugin (port of the Jellyfin one)
+- [ ] Optional userscript that adds a chat panel to Jellyfin/Emby/Plex Web
 
 ## Acknowledgements
 
