@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/primitives'
 import { api, type Preferences, type Sections } from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import { SERVICES } from '@/lib/services'
+import { SERVICE_NAMES, SERVICES } from '@/lib/services'
 import { cn } from '@/lib/utils'
 
 const TABS = [
@@ -199,7 +199,7 @@ function GeneralTab() {
                 className="flex items-center gap-3 rounded-lg bg-white/[0.03] px-3 py-2.5 ring-1 ring-white/[0.06]"
               >
                 <StatusDot state={!s.configured ? 'off' : s.ok ? 'ok' : 'down'} />
-                <span className="text-sm capitalize">{s.name}</span>
+                <span className="text-sm">{SERVICE_NAMES[s.name] ?? s.name}</span>
                 <span
                   className="ml-auto truncate text-xs text-muted-foreground"
                   title={s.detail ?? undefined}

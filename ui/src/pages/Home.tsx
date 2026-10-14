@@ -93,14 +93,14 @@ export default function HomePage() {
         </section>
 
         {overview === undefined && (
-          <section className="grid gap-4 lg:grid-cols-3" aria-busy="true">
+          <section className="grid grid-cols-1 gap-4 lg:grid-cols-3" aria-busy="true">
             <Panel className="h-44 animate-pulse lg:col-span-2" />
             <Panel className="h-44 animate-pulse" />
           </section>
         )}
 
         {overview && (
-          <section className="grid gap-4 lg:grid-cols-3">
+          <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <Panel className="p-5 lg:col-span-2">
               <SectionTitle
                 title="Downloading"

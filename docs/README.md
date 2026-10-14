@@ -1,52 +1,48 @@
-# maestarr documentation
+# How Maestarr works
 
-*Start here. This page is the entry point and the reading order; every other
-page assumes you arrived through it.*
+## The pieces
 
-## What this directory is for
+```
+ web UI (React) ─┐                       ┌─ Sonarr / Radarr / Whisparr  (search, grab, import, delete)
+ Telegram bot  ──┼─ FastAPI ─ pydantic-ai agent ─ tools ─┼─ Prowlarr                     (free-text search)
+ MCP clients   ──┘   (auth, settings,     (typed, with    ├─ qBittorrent                  (file lists, file selection)
+                      chat stream)          approvals)    ├─ trackers                     (live scrape)
+                                                          └─ Jellyfin, TMDB, OMDb, AniList, Trakt, StashDB
+```
 
-There are three guidance surfaces in this repository and they have different
-jobs. Putting content in the wrong one is how it goes stale unnoticed:
+- `maestarr/ops/` holds the operations. The agent's tools (`maestarr/agent/tools.py`)
+  and the MCP server (`maestarr/server.py`) are thin wrappers over them, so the web
+  chat, Telegram and MCP behave identically.
+- State-changing tools raise pydantic-ai's `ApprovalRequired`; a run pauses and
+  each interface asks the user (approval card, Telegram buttons). MCP clients get
+  the destructive flag and ask on their side.
+- Settings live in SQLite (`configstore.py`); environment variables are only
+  defaults. Saving a setting rebuilds the service clients and restarts the
+  Telegram bot.
 
-| Surface | Job | Audience |
-| --- | --- | --- |
-| `CLAUDE.md` | The rules, and the architecture facts that must not be guessed | Agents |
-| `.claude/project-map.md` | Where things *live* — files, tests, commands, entrypoints | Agents |
-| `docs/` (here) | **Why** things are the way they are | Humans |
+## The release judge
 
-`docs/` teaches. It is written for a competent Python developer with no prior
-exposure to this project, trying to make a first change. Explain *why*,
-including what was tried and rejected — that is the part a reader cannot
-reconstruct from the code.
+`maestarr/judge/` decides what to download:
 
-Rules files are terse because an agent reads them every session. These pages
-can afford prose, because a human reads them once.
+1. **Pre-rank** every result of an interactive search cheaply: the app's own
+   rejections and custom-format score, resolution limits, indexer seeders.
+2. **Enrich** the best few (default 6):
+   - the file list — from the `.torrent` behind the download link, from a torrent
+     already in qBittorrent, from qBittorrent 5.2+'s `fetchMetadata` (adds
+     nothing), or from a probe that stops on metadata and is deleted;
+   - live swarm numbers — a UDP/HTTP scrape of the trackers (the maximum across
+     trackers, never the sum).
+3. **Analyse** the files: which episodes are inside, whether part of a pack is a
+   different show, executables or junk, samples, the bitrate a size implies.
+4. **Score** with named reasons and blockers, then let the model write the verdict
+   (or take the best viable score when no model is set). For packs, the verdict
+   includes the exact files to download.
 
-## Reading order
+## Recommendations
 
-Read these in order the first time. Each assumes the ones before it.
-
-1. [getting-started.md](getting-started.md) — install it, run it, verify it.
-   Do this before reading anything else.
-4. **the HTTP surface** — routes, and how a request becomes a response.
-5. **the MCP surface** — tools, transports, and why logging must stay off
-   stdout.
-6. **lifecycle** — one request traced through every layer, naming a real file
-   at each hop. Write this page once the vocabulary above exists; it becomes
-   the single most useful page in the tree.
-
-Numbered gaps above are pages worth writing as the project grows. Delete the
-lines you will not write rather than leaving them as aspirations.
-
-## Keeping these pages true
-
-Documentation that lies is worse than documentation that is missing — a reader
-trusts it and is misled. Two habits keep it honest:
-
-- Run the `documenter` agent (`.claude/agents/documenter.md`) after a spec
-  packet ships. It reads the diff, not the spec, and updates these pages to
-  match what was actually built.
-- Once this tree has more than a couple of pages, add a `tests/unit/test_docs.py`
-  that machine-checks link resolution, that every repo path named in a fenced
-  block exists, and that every documented CLI command is registered. A rename
-  that outlives its documentation should fail a test, not rot quietly.
+`maestarr/taste/` turns history into a weighted profile — each title counts
+recency × your rating × rewatches — over genres, TMDB keywords, people, language
+and decade. Candidates come from TMDB recommendations of your strongest titles,
+discover queries on your top genres, and mood keywords; each is scored per
+dimension with diminishing returns. Already-watched titles are dropped; owned ones
+are kept and marked.

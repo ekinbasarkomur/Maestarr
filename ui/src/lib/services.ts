@@ -300,3 +300,18 @@ export const PROVIDERS: ProviderDef[] = [
     urlPlaceholder: 'http://localhost:1234/v1',
   },
 ]
+
+/** Proper names for the service ids the API reports. */
+export const SERVICE_NAMES: Record<string, string> = {
+  sonarr: 'Sonarr',
+  radarr: 'Radarr',
+  whisparr: 'Whisparr',
+  prowlarr: 'Prowlarr',
+  qbittorrent: 'qBittorrent',
+  jellyfin: 'Jellyfin',
+  tmdb: 'TMDB',
+  omdb: 'OMDb',
+  trakt: 'Trakt',
+  anilist: 'AniList',
+  stashdb: 'StashDB',
+}
