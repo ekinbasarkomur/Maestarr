@@ -168,7 +168,7 @@ maestarr serve-mcp    MCP over stdio
 - [x] Chat agent with approval-gated tools (web, Telegram, MCP)
 - [x] Recommendations from history and moods
 - [x] Browser-based setup and settings
-- [ ] Guided Telegram setup: test the bot token, then send `/start` to the bot and Maestarr picks up the chat ID itself
+- [x] Guided Telegram setup: test the bot token, then send `/start` to the bot and Maestarr picks up the chat ID itself
 - [ ] "Maestarr picks" collections synced into Jellyfin, Plex and Emby
 - [ ] Jellyfin plugin: chat inside the Jellyfin web UI
 - [ ] Plex connector (history, collections, webhooks) and Emby plugin
