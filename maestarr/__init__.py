@@ -1,6 +1,6 @@
 """maestarr package."""
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 # Spec packets applied to this codebase, in order. Bump as specs land.
 APPLIED_SPECS: tuple[int, ...] = ()

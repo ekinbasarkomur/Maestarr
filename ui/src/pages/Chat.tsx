@@ -252,14 +252,22 @@ function ChatView({
     () => new DefaultChatTransport({ api: '/api/chat', credentials: 'same-origin' }),
     [],
   )
-  const { messages, sendMessage, status, error, stop, addToolApprovalResponse, clearError } =
-    useChat({
-      id,
-      messages: initialMessages,
-      transport,
-      sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
-      onFinish: () => onActivity(),
-    })
+  const {
+    messages,
+    sendMessage,
+    setMessages,
+    status,
+    error,
+    stop,
+    addToolApprovalResponse,
+    clearError,
+  } = useChat({
+    id,
+    messages: initialMessages,
+    transport,
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
+    onFinish: () => onActivity(),
+  })
   const [input, setInput] = useState('')
   const sentInitial = useRef(false)
   const scroller = useRef<HTMLDivElement>(null)
@@ -283,6 +291,30 @@ function ChatView({
       send(initialPrompt)
     }
   }, [initialPrompt, send])
+
+  // Stop the turn; the server records it as cancelled, and so does this view.
+  const cancel = useCallback(async () => {
+    await stop()
+    setMessages((list) => {
+      const last = list[list.length - 1]
+      const marker = { type: 'text' as const, text: CANCELLED }
+      if (last?.role === 'assistant')
+        return [...list.slice(0, -1), { ...last, parts: [...last.parts, marker] }]
+      return [
+        ...list,
+        { id: `cancelled-${Date.now()}`, role: 'assistant' as const, parts: [marker] },
+      ]
+    })
+  }, [setMessages, stop])
+
+  // Opening a conversation starts at its latest message.
+  const opened = useRef(false)
+  useEffect(() => {
+    const el = scroller.current
+    if (!el || opened.current || messages.length === 0) return
+    opened.current = true
+    requestAnimationFrame(() => el.scrollTo({ top: el.scrollHeight }))
+  }, [messages.length])
 
   useEffect(() => {
     const el = scroller.current
@@ -354,13 +386,25 @@ function ChatView({
                   }
                 />
               ))}
-              {status === 'submitted' && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span className="relative flex size-2">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
-                    <span className="relative inline-flex size-2 rounded-full bg-primary" />
-                  </span>
-                  Thinking…
+              {busy && (
+                <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                  {status === 'submitted' && (
+                    <>
+                      <span className="relative flex size-2">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
+                        <span className="relative inline-flex size-2 rounded-full bg-primary" />
+                      </span>
+                      Thinking…
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => void cancel()}
+                    className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs ring-1 ring-white/15 transition hover:bg-white/[0.06] hover:text-foreground"
+                  >
+                    <Square className="size-3 fill-current" />
+                    Cancel
+                  </button>
                 </div>
               )}
             </div>
@@ -403,7 +447,7 @@ function ChatView({
               type="button"
               size="md"
               variant="secondary"
-              onClick={() => void stop()}
+              onClick={() => void cancel()}
               title="Stop"
             >
               <Square className="size-4 fill-current" />
@@ -421,6 +465,9 @@ function ChatView({
     </>
   )
 }
+
+/** Saved by the server (and added here) when a turn is stopped before it finishes. */
+const CANCELLED = '⏹ Cancelled'
 
 function describeError(error: Error): { text: string; settings: boolean } {
   const raw = error.message || ''
@@ -495,6 +542,16 @@ function MessageRow({
       <Logo className="mt-0.5 size-7 shrink-0" />
       <div className="min-w-0 flex-1 space-y-2.5">
         {message.parts.map((part, i) => {
+          if (part.type === 'text' && part.text === CANCELLED)
+            return (
+              <p
+                key={i}
+                className="inline-flex w-fit items-center gap-1.5 rounded-full bg-white/[0.05] px-2.5 py-1 text-xs text-muted-foreground ring-1 ring-white/10"
+              >
+                <Square className="size-3 fill-current" />
+                Cancelled
+              </p>
+            )
           if (part.type === 'text') return part.text ? <Markdown key={i} text={part.text} /> : null
           if (!isToolUIPart(part)) return null
           const p = part as unknown as {

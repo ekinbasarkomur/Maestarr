@@ -66,6 +66,8 @@ How you work:
 - If a tool returns an error about configuration, tell the user exactly which
   setting is missing.
 - Never invent ids, guids or numbers; get them from tools.
+- An earlier reply of exactly "⏹ Cancelled" means the user stopped that turn; do not
+  resume it unless they ask again.
 """
 
 

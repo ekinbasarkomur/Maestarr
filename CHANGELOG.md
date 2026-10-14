@@ -7,6 +7,17 @@ change behaviour.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-15
+
+### Added
+- **Cancel a turn**: a Cancel button next to the running reply (and the stop button
+  in the composer). Your message is always saved; a turn that is stopped, or cut off
+  by a page reload or a closed tab, is kept as **Cancelled** in the conversation.
+- Opening a conversation starts at its latest message.
+- Telegram: a search button for each recommended title under the poster album, and
+  approvals as a formatted card with Approve / Deny buttons.
+
+
 ## [0.3.0] - 2026-10-15
 
 ### Added
@@ -72,7 +83,8 @@ The first public release.
 - Long release searches are allowed up to 30 minutes, with a clear message.
 - A chat that contained a "thinking" reply no longer fails on the next message.
 
-[Unreleased]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.2.0...v0.2.1

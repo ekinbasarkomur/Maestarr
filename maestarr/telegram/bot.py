@@ -151,18 +151,29 @@ class TelegramChannel:
             return f"{head}{rating}\n{html.escape(str(c.get('why') or ''))}"[:1000]
 
         with_image = [c for c in cards if c.get("image")][:10]
+        sent = False
         if len(with_image) >= 2:
             media = [InputMediaPhoto(media=c["image"], caption=caption(c), parse_mode="HTML") for c in with_image]
             try:
                 await self.bot.send_media_group(chat_id, media=media)  # type: ignore[arg-type]
-                return
+                sent = True
             except TelegramBadRequest as exc:
                 logger.warning("poster album failed (%s); sending a list", exc)
         elif len(with_image) == 1:
             with contextlib.suppress(TelegramBadRequest):
                 await self.bot.send_photo(chat_id, with_image[0]["image"], caption=caption(with_image[0]), parse_mode="HTML")
-                return
-        await self.bot.send_message(chat_id, "\n\n".join(caption(c) for c in cards), parse_mode="HTML")
+                sent = True
+        if not sent:
+            await self.bot.send_message(chat_id, "\n\n".join(caption(c) for c in cards), parse_mode="HTML")
+        # Albums cannot carry buttons: one message with a search button per title.
+        key = uuid.uuid4().hex[:10]
+        self._picks[key] = {"cards": cards[:10]}
+        keyboard = [
+            [InlineKeyboardButton(text=f"🔍 {c.get('title')}"[:60], callback_data=f"rc:{key}:{i}")]
+            for i, c in enumerate(cards[:10])
+        ]
+        await self.bot.send_message(chat_id, "Pick one to search for releases:",
+                                    reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
 
     async def send_picker(self, chat_id: int, data: dict[str, Any]) -> None:
         """Judged releases as a numbered list with a download button per release."""
@@ -187,9 +198,14 @@ class TelegramChannel:
         await self.bot.send_message(chat_id, "\n".join(lines), parse_mode="HTML",
                                     reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
 
+    def card_prompt(self, key: str, index: int) -> Optional[str]:
+        entry = self._picks.get(key)
+        cards = (entry or {}).get("cards") or []
+        return search_prompt(cards[index]) if 0 <= index < len(cards) else None
+
     def pick_prompt(self, key: str, choice: str) -> Optional[str]:
         entry = self._picks.get(key)
-        if not entry:
+        if not entry or "rows" not in entry:
             return None
         if choice == "more":
             return (f"Show more results for {entry['subject']} "
@@ -209,7 +225,8 @@ class TelegramChannel:
                     InlineKeyboardButton(text="✖️ Deny", callback_data=f"ap:{call.tool_call_id}:0"[:64]),
                 ]]
             )
-            await self.bot.send_message(chat_id, f"Approval needed:\n{summary}", reply_markup=keyboard)
+            await self.bot.send_message(chat_id, f"🛡 <b>Needs your approval</b>\n{html.escape(summary)}",
+                                        parse_mode="HTML", reply_markup=keyboard)
         await self.store.set_pending(cid, pending)
 
     async def decide(self, chat_id: int, call_id: str, approved: bool) -> Optional[str]:
@@ -227,6 +244,23 @@ class TelegramChannel:
         }
         await self.run(chat_id, cid, results=DeferredToolResults(approvals=approvals))
         return None
+
+
+def search_prompt(c: dict[str, Any]) -> str:
+    """What a card's search button asks the agent (same as the web chat's).
+
+    >>> search_prompt({"kind": "movie", "title": "Se7en", "year": 1995, "tmdb_id": 807})
+    'Search releases for "Se7en", 1995, tmdb 807: add it to Radarr if it is missing, then judge the releases.'
+    """
+    year = f", {c['year']}" if c.get("year") else ""
+    if c.get("kind") == "scene":
+        sid = f" (StashDB {c['stash_id']})" if c.get("stash_id") else ""
+        return f'Find releases for the scene "{c.get("title")}"{sid}: add it to Whisparr if it is missing, then judge the releases.'
+    if c.get("kind") == "movie":
+        tmdb = f", tmdb {c['tmdb_id']}" if c.get("tmdb_id") else ""
+        return f'Search releases for "{c.get("title")}"{year}{tmdb}: add it to Radarr if it is missing, then judge the releases.'
+    tvdb = f", tvdb {c['tvdb_id']}" if c.get("tvdb_id") else ""
+    return f'Search releases for the {c.get("kind")} "{c.get("title")}"{year}{tvdb}: add it to Sonarr if it is missing, then judge the releases.'
 
 
 def build_dispatcher(channel: TelegramChannel) -> Dispatcher:
@@ -272,6 +306,23 @@ def build_dispatcher(channel: TelegramChannel) -> Dispatcher:
             if await channel.store.pending(cid):
                 await channel.store.set_pending(cid, None)  # a new message abandons open approvals
             await channel.run(chat_id, cid, prompt=message.text)
+
+    @dp.callback_query(F.data.startswith("rc:"))
+    async def card(query: CallbackQuery) -> None:
+        chat_id = query.message.chat.id if query.message else query.from_user.id
+        if not channel.allowed_chat(chat_id):
+            await query.answer("Not allowed")
+            return
+        _, key, index = (query.data or "::0").split(":", 2)
+        prompt = channel.card_prompt(key, int(index or 0))
+        if not prompt:
+            await query.answer("Those picks expired — ask again")
+            return
+        await query.answer("Searching…")
+        async with channel.lock(chat_id):
+            cid = await channel.conversation(chat_id)
+            await channel.bot.send_message(chat_id, f"➡️ {prompt}")
+            await channel.run(chat_id, cid, prompt=prompt)
 
     @dp.callback_query(F.data.startswith("pk:"))
     async def pick(query: CallbackQuery) -> None:
