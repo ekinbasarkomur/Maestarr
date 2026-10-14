@@ -7,6 +7,14 @@ change behaviour.
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-15
+
+### Changed
+- A turn's progress is saved as it happens — before every model request, so after
+  each round of tool calls. A cancelled turn now shows everything it had done, the
+  half-written answer, and **Cancelled** on the assistant's reply.
+
+
 ## [0.4.0] - 2026-10-15
 
 ### Added
@@ -83,7 +91,8 @@ The first public release.
 - Long release searches are allowed up to 30 minutes, with a clear message.
 - A chat that contained a "thinking" reply no longer fails on the next message.
 
-[Unreleased]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.2.1...v0.2.2

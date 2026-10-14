@@ -1,6 +1,6 @@
 [project]
 name = "maestarr"
-version = "0.4.0"
+version = "0.4.1"
 description = "Maestarr — an AI maestro for your *arr stack: taste-aware recommendations, release judging with live swarm data, and chat control of Sonarr, Radarr, Prowlarr and qBittorrent"
 requires-python = ">=3.12"
 authors = [{ name = "Ekin Başar Kömür" }]

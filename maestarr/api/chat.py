@@ -10,12 +10,13 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
+from maestarr.agent.progress import TURN, TurnRecorder
 from maestarr.api.deps import require_user
 from maestarr.config import get_settings
 from maestarr.store import Store, title_from
@@ -60,9 +61,13 @@ async def chat(request: Request, _: Any = Depends(require_user)) -> Response:
 
     adapter = await MaestarrAdapter.from_request(request, agent=agent, sdk_version=6)  # type: ignore[arg-type]
     history = list(adapter.messages)
+    recorder: Optional[TurnRecorder] = None
     if cid:
-        # The user's message is kept even if the turn never finishes.
+        # The user's message is kept even if the turn never finishes, and every
+        # step after it is saved as it happens (see maestarr.agent.progress).
         await store.save_messages(cid, history)
+        recorder = TurnRecorder(store, cid, history)
+        TURN.set(recorder)
     finished = False
 
     async def on_complete(result: Any) -> None:
@@ -76,36 +81,41 @@ async def chat(request: Request, _: Any = Depends(require_user)) -> Response:
 
     async def guarded() -> Any:
         """Stop, a page reload or a closed tab ends the stream early: the turn is
-        abandoned and recorded as cancelled."""
+        recorded as cancelled, keeping what it had done and written so far."""
         try:
             async for chunk in inner:
+                if recorder is not None:
+                    recorder.partial += text_deltas(chunk)
                 yield chunk
         finally:
-            if cid and not finished:
-                await asyncio.shield(store.save_messages(cid, mark_cancelled(history)))
+            if recorder is not None and not finished:
+                await asyncio.shield(recorder.cancelled())
 
     response.body_iterator = guarded()
     return response
 
 
-CANCELLED = "⏹ Cancelled"
+def text_deltas(chunk: Any) -> str:
+    r"""The answer text inside one server-sent-events chunk of the UI stream.
 
-
-def mark_cancelled(history: list[Any]) -> list[Any]:
-    """The history with a cancelled marker as the assistant's answer to the last message.
-
-    >>> from pydantic_ai.messages import ModelRequest, UserPromptPart
-    >>> out = mark_cancelled([ModelRequest(parts=[UserPromptPart(content="hi")])])
-    >>> out[-1].parts[0].content
-    '⏹ Cancelled'
+    >>> text_deltas(b'data: {"type":"text-delta","id":"t","delta":"Hel"}\n\ndata: {"type":"text-delta","id":"t","delta":"lo"}\n\n')
+    'Hello'
+    >>> text_deltas('data: {"type":"tool-input-available"}\n\n')
+    ''
     """
-    from pydantic_ai.messages import ModelResponse, TextPart
-
-    if history and isinstance(history[-1], ModelResponse) and any(
-        isinstance(p, TextPart) and p.content == CANCELLED for p in history[-1].parts
-    ):
-        return history
-    return [*history, ModelResponse(parts=[TextPart(content=CANCELLED)])]
+    raw = chunk.decode() if isinstance(chunk, (bytes, bytearray)) else str(chunk)
+    if "text-delta" not in raw:
+        return ""
+    out = []
+    for line in raw.splitlines():
+        if line.startswith("data: ") and "text-delta" in line:
+            try:
+                event = json.loads(line[6:])
+            except ValueError:
+                continue
+            if event.get("type") == "text-delta":
+                out.append(str(event.get("delta") or ""))
+    return "".join(out)
 
 
 @router.get("/conversations")

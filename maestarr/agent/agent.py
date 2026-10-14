@@ -11,12 +11,14 @@ import functools
 from datetime import date
 from typing import Any, Union
 
+from pydantic_ai.capabilities import ProcessHistory
 from pydantic_ai import Agent, DeferredToolRequests, RunContext
 
 from maestarr.agent.tools import toolset
 from maestarr.config import Settings, get_settings
 from maestarr.llm import ModelNotConfigured, build_model
 from maestarr.agent.channel import CHANNEL
+from maestarr.agent.progress import record_progress
 from maestarr.language import reply_language
 from maestarr.services import Services
 
@@ -118,6 +120,8 @@ def create_agent(settings: Settings, model: Any = None) -> Agent[Services, Agent
         output_type=[str, DeferredToolRequests],  # type: ignore[arg-type]
         instructions=[BASE_INSTRUCTIONS, _dynamic_instructions],
         toolsets=[toolset],
+        # Saves each step of a turn as it happens, so a cancelled turn keeps its state.
+        capabilities=[ProcessHistory(processor=record_progress)],
         retries=2,
         name="maestarr",
     )
