@@ -13,6 +13,9 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-d4a64a" alt="GPL-3.0" /></a>
   <img src="https://img.shields.io/badge/python-3.12+-3776ab" alt="Python 3.12+" />
+  <a href="https://github.com/ekinbasarkomur/Maestarr/actions/workflows/ci.yml"><img src="https://github.com/ekinbasarkomur/Maestarr/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/ekinbasarkomur/Maestarr/releases"><img src="https://img.shields.io/github/v/release/ekinbasarkomur/Maestarr?color=d4a64a" alt="Release" /></a>
+  <a href="https://github.com/ekinbasarkomur/Maestarr/pkgs/container/maestarr"><img src="https://img.shields.io/badge/ghcr.io-maestarr-2496ed?logo=docker&logoColor=white" alt="Docker image" /></a>
   <img src="https://img.shields.io/badge/status-early%20development-e06c6c" alt="Early development" />
   <img src="https://img.shields.io/badge/vibecoded-yes-8b7cf6" alt="Vibecoded" />
 </p>
@@ -103,15 +106,15 @@ without your approval.
 
 ## Installation
 
-Maestarr ships as one Docker image (the web UI is built into it).
+Maestarr ships as one Docker image for amd64 and arm64 (the web UI is built in).
 
 ```yaml
 # compose.yml
 services:
   maestarr:
-    image: maestarr:local
-    build: https://github.com/ekinbasarkomur/Maestarr.git
+    image: ghcr.io/ekinbasarkomur/maestarr:latest   # or pin a version, e.g. :0.2
     container_name: maestarr
+    init: true
     restart: unless-stopped
     volumes:
       - ./data:/data            # settings, conversations, logs
@@ -193,12 +196,21 @@ maestarr serve-mcp    MCP over stdio
 - [ ] Jellyfin plugin: chat inside the Jellyfin web UI
 - [ ] Plex connector (history, collections, webhooks) and Emby plugin
 - [ ] Transmission and Deluge support
-- [ ] Published Docker image and releases
+- [x] Published Docker image and releases
 
 Research on media-server plugins: Jellyfin server plugins are official and a
 chat page is possible through community plugins (Plugin Pages / File
 Transformation); Emby supports plugin pages; Plex no longer has a plugin
 system, so it will be integrated through its API instead.
+
+## Updating
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+Settings and conversations live in `./data` and survive updates. See the
+[changelog](CHANGELOG.md) for what changed.
 
 ## Development
 
@@ -225,6 +237,15 @@ The recommendation weighting is inspired by
 [Curatarr](https://github.com/OrchestratedChaos/curatarr). Maestarr builds on
 the [Servarr](https://wiki.servarr.com) projects and the
 [TRaSH Guides](https://trash-guides.info).
+
+## Contributing
+
+Bug reports, ideas and pull requests are welcome — see
+[CONTRIBUTING.md](CONTRIBUTING.md). Please report security issues privately
+([SECURITY.md](SECURITY.md)).
+
+Maestarr's sister project, [Orchestarr](https://github.com/ekinbasarkomur/Orchestarr),
+will install and wire a whole media stack from Maestarr's onboarding.
 
 ## License
 

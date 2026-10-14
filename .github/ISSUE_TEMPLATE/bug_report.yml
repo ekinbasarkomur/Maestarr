@@ -1,0 +1,37 @@
+name: Bug report
+description: Something does not work as it should
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Maestarr version
+      description: Shown under Settings → General.
+      placeholder: 0.2.0
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How do you run it
+      options: [Docker image, Docker (built from source), Without Docker]
+    validations:
+      required: true
+  - type: textarea
+    id: stack
+    attributes:
+      label: Your stack
+      description: Versions of the apps involved (Sonarr, Radarr, qBittorrent, Jellyfin, …) and the AI provider/model.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: The relevant lines from `data/logs/maestarr.log`. Remove API keys and personal details.
+      render: text

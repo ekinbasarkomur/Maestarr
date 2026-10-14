@@ -1,0 +1,19 @@
+name: Feature request
+description: An idea for Maestarr
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like to do
+      description: The problem or the workflow, in your own words.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How it could work
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do today instead

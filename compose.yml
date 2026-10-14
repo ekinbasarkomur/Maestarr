@@ -9,8 +9,10 @@
 
 services:
   maestarr:
-    image: maestarr:local
-    build: .
+    image: ghcr.io/ekinbasarkomur/maestarr:latest
+    # To build from a checkout instead: comment the line above and use
+    # image: maestarr:local
+    # build: .
     container_name: maestarr
     restart: unless-stopped
     # A real init as PID 1, so exited healthcheck processes are reaped.
