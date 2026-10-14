@@ -108,3 +108,31 @@ async def test_denied_tool_is_not_run(client):
     types = [e["type"] for e in _events(r.text)]
     assert "tool-output-denied" in types
     assert "tool-output-available" not in types
+
+
+def test_reasoning_part_with_client_id_is_accepted():
+    """The AI SDK sends reasoning parts back with an `id`; that used to 422 every later turn."""
+    import json as _json
+
+    from maestarr.api.stream import MaestarrAdapter
+
+    body = {
+        "id": "c1",
+        "trigger": "submit-message",
+        "messages": [
+            {"id": "u1", "role": "user", "parts": [{"type": "text", "text": "hi"}]},
+            {
+                "id": "a1",
+                "role": "assistant",
+                "parts": [
+                    {"type": "step-start", "state": "done"},
+                    {"type": "reasoning", "id": "r1", "text": "", "state": "done",
+                     "providerMetadata": {"pydantic_ai": {"signature": "s", "provider_name": "anthropic"}}},
+                    {"type": "text", "text": "hello", "state": "done"},
+                ],
+            },
+            {"id": "u2", "role": "user", "parts": [{"type": "text", "text": "again"}]},
+        ],
+    }
+    run_input = MaestarrAdapter.build_run_input(_json.dumps(body).encode())
+    assert len(run_input.messages) == 3

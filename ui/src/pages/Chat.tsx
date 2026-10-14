@@ -397,10 +397,14 @@ function describeError(error: Error): { text: string; settings: boolean } {
   try {
     const body = JSON.parse(raw)
     if (body?.message) return { text: body.message, settings: false }
-    if (body?.detail) return { text: String(body.detail), settings: false }
+    if (typeof body?.detail === 'string') return { text: body.detail, settings: false }
+    // A validation error (a list of pydantic errors) is never useful to read.
+    if (Array.isArray(body) || Array.isArray(body?.detail))
+      return { text: 'The server could not read this chat. Try sending again.', settings: false }
   } catch {
     // plain text
   }
+  if (raw.length > 300) return { text: 'Something went wrong. Try sending again.', settings: false }
   return { text: raw || 'Something went wrong.', settings: false }
 }
 

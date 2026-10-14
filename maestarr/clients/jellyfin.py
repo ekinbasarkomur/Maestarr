@@ -36,6 +36,9 @@ class JellyfinClient(HttpService):
                 "Authorization": f'MediaBrowser Token="{api_key}", Client="Maestarr", Device="server", DeviceId="maestarr", Version="1"',
                 "Accept": "application/json",
             },
+            # Jellyfin sorts the whole library by play date for history queries;
+            # on a big library or a busy host that takes far longer than 30 s.
+            timeout=httpx.Timeout(120.0, connect=10.0),
             transport=transport,
         )
         self._user_name = user

@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from datetime import datetime
 from typing import Any, Literal, Optional
 
 from maestarr.clients.base import ServiceError
@@ -44,7 +45,55 @@ async def library_index(svc: Services) -> tuple[set[tuple[str, int]], dict[str, 
     return owned, {"series_by_tvdb": by_tvdb, "movie_by_tmdb": by_tmdb_movie}
 
 
+HISTORY_TTL = 15 * 60
+
+
+def _parse_added(value: Any) -> Optional[datetime]:
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")) if value else None
+    except ValueError:
+        return None
+
+
+async def library_history(svc: Services, limit: int = 300) -> list[WatchEvent]:
+    """What the user chose to keep, as a weak stand-in for watch history.
+
+    Used only when no real history exists (a fresh Jellyfin, no Trakt), so
+    recommendations still have something to start from.
+    """
+    events: list[WatchEvent] = []
+    if svc.radarr:
+        for m in await svc.radarr.movies():
+            if m.get("hasFile") and m.get("title"):
+                events.append(WatchEvent(
+                    kind="movie", title=m["title"], year=m.get("year"), tmdb_id=m.get("tmdbId"),
+                    imdb_id=m.get("imdbId"), watched_at=_parse_added(m.get("added")), source="library",
+                ))
+    if svc.sonarr:
+        for s in await svc.sonarr.series():
+            if (s.get("statistics") or {}).get("episodeFileCount") and s.get("title"):
+                events.append(WatchEvent(
+                    kind="anime" if s.get("seriesType") == "anime" else "series", title=s["title"],
+                    year=s.get("year"), tmdb_id=s.get("tmdbId"), tvdb_id=s.get("tvdbId"),
+                    imdb_id=s.get("imdbId"), watched_at=_parse_added(s.get("added")), source="library",
+                ))
+    events.sort(key=lambda e: e.watched_at.timestamp() if e.watched_at else 0.0, reverse=True)
+    return events[:limit]
+
+
 async def watch_history(svc: Services, limit: int = 400) -> list[WatchEvent]:
+    """Merged history from every source, cached for a while (Jellyfin can take a minute)."""
+    cached = svc.memo.get("watch_history")
+    if cached and time.time() - cached[0] < HISTORY_TTL:
+        return list(cached[1])
+    history = await _collect_history(svc, limit)
+    if not history:
+        history = await library_history(svc)
+    svc.memo["watch_history"] = (time.time(), history)
+    return list(history)
+
+
+async def _collect_history(svc: Services, limit: int) -> list[WatchEvent]:
     sources: list[list[WatchEvent]] = []
     tasks = []
     if svc.jellyfin:
@@ -81,7 +130,7 @@ async def taste_profile(svc: Services, refresh: bool = False) -> TasteProfile:
         return cached[1]
     history = await watch_history(svc)
     if not history:
-        raise ServiceError("maestarr", "no watch history — configure Jellyfin (or Trakt/AniList/Letterboxd)")
+        raise ServiceError("maestarr", "no watch history and an empty library — watch something in Jellyfin or connect Trakt/AniList")
     profile = await build_profile(history, _cache(svc))
     svc.memo["taste_profile"] = (time.time(), profile)
     return profile
