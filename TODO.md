@@ -114,3 +114,57 @@ Maestarr itself never calling an LLM.
 
 - Rate limits per token?
 - Should the Telegram bot also work without an AI key (button-driven menus only)?
+
+---
+
+## 3. A learning recommender (machine learning), no AI key needed
+
+The recommender is already deterministic — picks are scored without any LLM —
+but its weights are fixed by hand (keywords 0.45, genres 0.25, people 0.20 …) and
+it only reacts to feedback through simple boosts. With the signals Maestarr now
+collects it can **learn** each user's taste, entirely locally, so installs
+without an AI provider get picks that improve with use.
+
+### Signals already there (labels)
+
+- **Positive**: watched (with rating, rewatches), favourite (Jellyfin/AniList), requested
+  (Seerr), added to Sonarr/Radarr, opened / searched / downloaded from a suggestion.
+- **Negative**: *Not for me*; shown repeatedly without a reaction (implicit skip, the
+  same impressions table the spacing uses); added but never watched for months (weak).
+
+### Approach (in order of effort)
+
+1. **Learned weights** — a small logistic-regression / gradient-boosted model (scikit-learn,
+   or plain numpy) over the features the scorer already computes: keyword, genre, people,
+   language, decade overlaps, TMDB rating and votes, popularity, runtime, age, "because
+   you watched" origin, in-library. Trained per user on the labels above; falls back to
+   today's hand weights until there are ~50 labelled impressions.
+2. **Content embeddings** — represent each title by its keywords, genres, people and
+   overview (TF-IDF, or a small local sentence-embedding model such as all-MiniLM ~90 MB if
+   memory allows); taste = weighted mean of liked items minus disliked; candidates ranked
+   by cosine similarity. Gives "similar in feel" beyond exact tag overlap.
+3. **Item-to-item collaborative signal** — single-user installs have no "people like you",
+   but public data can stand in: TMDB's own recommendations/similar lists (already used as
+   candidates) and, optionally, a precomputed item-item matrix from an open dataset
+   (e.g. MovieLens) shipped as a small file, mapped by TMDB id.
+4. **Exploration** — keep a share of each shelf (e.g. 15 %) for titles the model is
+   unsure about (bandit-style), so taste can widen instead of narrowing to Batman.
+
+### Product
+
+- Settings → Discovery → *Recommendation engine*: **Rules** (today) / **Learned** (default
+  once enough data) / **Learned + AI explanations** (when an AI key exists, the LLM only
+  writes the "why", never ranks).
+- Training runs with the cache refresh (daily, in the background), takes seconds, and
+  stores the model in the data directory; *Reset what Maestarr learned* button.
+- "Why this pick" stays readable: the top contributing features become the reason text
+  ("themes you watch: heist, twist ending · with Christopher Nolan").
+- Metrics on the settings page: how often picks get opened/searched vs dismissed, before
+  and after learning.
+
+### Constraints
+
+- Must fit the 8 GB home server: no GPU, model files under ~100 MB, training under a minute.
+- Works per user (see #1) and for adult scenes separately (StashDB tags/performers/studios
+  as features), never mixing the two.
+- No data leaves the server.
