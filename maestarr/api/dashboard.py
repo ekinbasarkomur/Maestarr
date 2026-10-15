@@ -49,8 +49,20 @@ def _poster(images: list[dict[str, Any]]) -> Optional[str]:
 
 @router.get("/overview")
 async def overview(_: Any = Depends(require_user)) -> dict[str, Any]:
-    """Library counts, disks, active downloads and recent watching for the home screen."""
     svc = get_services()
+    return _without_adult_downloads(svc, await _overview(svc))
+
+
+def _without_adult_downloads(svc: Any, data: dict[str, Any]) -> dict[str, Any]:
+    """Whisparr downloads show on the home page only when both switches allow it."""
+    s = svc.settings
+    if s.MAESTARR_ADULT_CONTENT and s.MAESTARR_HOME_ADULT_DOWNLOADS:
+        return data
+    return {**data, "queue": [q for q in data.get("queue", []) if q.get("app") != "whisparr"]}
+
+
+async def _overview(svc: Any) -> dict[str, Any]:
+    """Library counts, disks, active downloads and recent watching for the home screen."""
     cached = svc.memo.get("overview")
     if cached:
         # Serve the last result at once; refresh in the background when it is old.
@@ -145,15 +157,50 @@ async def recommendations(
     limit: int = 12,
     _: Any = Depends(require_user),
 ) -> Any:
-    from maestarr.ops.discovery import recommendations as recs, record_impressions
+    from maestarr.cache import cached
+    from maestarr.ops.discovery import cache_store, feedback_store, picks_age, record_impressions
+    from maestarr.ops.discovery import recommendations as recs
 
     svc = get_services()
+    tag_list = sorted({t.strip() for t in (tags or "").split(",") if t.strip()})
+    key = f"picks:recs:{kind}:{(mood or '').lower()}:{','.join(tag_list).lower()}:{limit}"
     try:
-        out = await recs(svc, kind=kind, mood=mood, limit=limit,  # type: ignore[arg-type]
-                         tags=[t.strip() for t in (tags or "").split(",") if t.strip()])
+        out = await cached(
+            cache_store(svc), key, max_age=picks_age(svc),
+            build=lambda: recs(svc, kind=kind, mood=mood, limit=limit + 6, tags=tag_list),  # type: ignore[arg-type]
+        )
     except ServiceError as exc:
         return JSONResponse({"detail": str(exc)}, status_code=503)
-    await record_impressions(svc, out["recommendations"])
+    hidden = (await feedback_store(svc).state()).hidden
+    from maestarr.taste.rows import _hidden
+
+    items = [r for r in out["recommendations"] if not _hidden(r, hidden)][:limit]
+    await record_impressions(svc, items)
+    return {**out, "recommendations": items}
+
+
+@router.get("/tonight")
+async def tonight(tags: Optional[str] = None, limit: int = 12, _: Any = Depends(require_user)) -> Any:
+    """Picks for tonight: downloaded, unwatched titles first; only when there are
+    too few is the shelf topped up with suggestions that still need fetching."""
+    from maestarr.taste.rows import ready_to_watch
+
+    svc = get_services()
+    tag_list = sorted({t.strip() for t in (tags or "").split(",") if t.strip()})
+    try:
+        ready = await ready_to_watch(svc, tag_list, limit)
+    except ServiceError as exc:
+        return JSONResponse({"detail": str(exc)}, status_code=503)
+    out: dict[str, Any] = {"based_on": [], "recommendations": ready, "ready_count": len(ready)}
+    if len(ready) < limit:
+        fill = await recommendations(kind="movie", tags=",".join(tag_list) or None, limit=limit, _=_)
+        if isinstance(fill, dict):
+            seen = {(r.get("kind"), r.get("tmdb_id")) for r in ready}
+            extra = [r for r in fill["recommendations"] if (r.get("kind"), r.get("tmdb_id")) not in seen]
+            out["recommendations"] = ready + extra[: limit - len(ready)]
+            out["based_on"] = fill.get("based_on", [])
+        elif not ready:
+            return fill
     return out
 
 
@@ -240,6 +287,21 @@ async def discover_genres(kind: str = "movie", _: Any = Depends(require_user)) -
     return sorted(names.values())
 
 
+@router.get("/cache")
+async def cache_status(_: Any = Depends(require_user)) -> Any:
+    from maestarr.refresh import status
+
+    return await status(get_services())
+
+
+@router.post("/cache/refresh")
+async def cache_refresh(_: Any = Depends(require_user)) -> Any:
+    """Rebuild history, libraries, taste profile and shelves now (in the background)."""
+    from maestarr.refresh import start_refresh
+
+    return {"started": start_refresh(get_services())}
+
+
 class Feedback(BaseModel):
     kind: str
     tmdb_id: int
@@ -255,9 +317,7 @@ async def feedback(body: Feedback, _: Any = Depends(require_user)) -> Any:
     if body.action not in ("open", "search", "add", "dismiss"):
         return JSONResponse({"detail": "unknown action"}, status_code=400)
     svc = get_services()
-    out = await react(svc, body.kind, body.tmdb_id, body.action, body.title)
-    svc.memo.pop("rows", None)
-    return out
+    return await react(svc, body.kind, body.tmdb_id, body.action, body.title)
 
 
 @router.get("/details")
@@ -308,3 +368,74 @@ async def put_preferences(body: dict[str, Any], _: Any = Depends(require_user)) 
     from maestarr.ops.downloads import update_preferences
 
     return update_preferences(get_services(), body)
+
+
+@router.get("/adult/rows")
+async def adult_rows(refresh: bool = False, _: Any = Depends(require_user)) -> Any:
+    from maestarr.taste import adult as adult_taste
+
+    svc = get_services()
+    try:
+        out = await adult_taste.rows(svc, refresh=refresh)
+    except ServiceError as exc:
+        return JSONResponse({"detail": str(exc).split(": ", 1)[-1]}, status_code=503)
+    await adult_taste.record_impressions(svc, [i for row in out["rows"] for i in row["items"][:8]])
+    return out
+
+
+class AdultSearch(BaseModel):
+    text: Optional[str] = None
+    tags: list[str] = []
+    exclude_tags: list[str] = []
+    performers: list[str] = []
+    studios: list[str] = []
+    date_from: Optional[str] = None
+    date_to: Optional[str] = None
+    min_minutes: Optional[int] = None
+    max_minutes: Optional[int] = None
+    sort: str = "relevance"
+    limit: int = 30
+
+
+@router.post("/adult/search")
+async def adult_search(body: AdultSearch, _: Any = Depends(require_user)) -> Any:
+    from maestarr.taste import adult as adult_taste
+
+    try:
+        return await adult_taste.search(
+            get_services(), text=(body.text or "").strip() or None, tags=body.tags, exclude_tags=body.exclude_tags,
+            performers=body.performers, studios=body.studios, date_from=body.date_from or None,
+            date_to=body.date_to or None, min_minutes=body.min_minutes, max_minutes=body.max_minutes,
+            sort=body.sort, limit=max(1, min(body.limit, 60)),
+        )
+    except ServiceError as exc:
+        return JSONResponse({"detail": str(exc).split(": ", 1)[-1]}, status_code=503)
+
+
+@router.get("/adult/suggest")
+async def adult_suggest(what: str, q: str, _: Any = Depends(require_user)) -> Any:
+    from maestarr.taste import adult as adult_taste
+
+    if len(q.strip()) < 2:
+        return []
+    try:
+        return await adult_taste.suggest(get_services(), what, q.strip())
+    except ServiceError as exc:
+        return JSONResponse({"detail": str(exc).split(": ", 1)[-1]}, status_code=503)
+
+
+class AdultFeedbackBody(BaseModel):
+    stash_id: str
+    action: str  # open | search | dismiss
+
+
+@router.post("/adult/feedback")
+async def adult_feedback(body: AdultFeedbackBody, _: Any = Depends(require_user)) -> Any:
+    from maestarr.taste import adult as adult_taste
+
+    if body.action not in ("open", "search", "add", "dismiss"):
+        return JSONResponse({"detail": "unknown action"}, status_code=400)
+    try:
+        return await adult_taste.react(get_services(), body.stash_id, body.action)
+    except ServiceError as exc:
+        return JSONResponse({"detail": str(exc).split(": ", 1)[-1]}, status_code=503)

@@ -7,8 +7,52 @@ change behaviour.
 
 ## [Unreleased]
 
+### Added
+- **Caching**: watch history, libraries, favourites and the taste profile are kept in
+  the database, so pages open at once even after a restart. They refresh when older
+  than an interval (12 h / 1 day / 1 week) — lazily on your next visit, or on a
+  schedule with *Refresh in the background* (off by default). *Refresh now* in
+  Settings → General → Caching rebuilds everything.
+- **Shelves stay put**: picks and shelves are cached and refreshed every 6 h / 12 h /
+  1 day (default) / 1 week, or only by hand; *Not for me* still applies at once.
+- **Home is the "For you" page**: *Picks for tonight* is a sliding shelf (still
+  filterable by tags), followed by every other shelf, with a loading screen while
+  they are first built. Discover keeps search.
+- **Picks for tonight are ready to watch**: the shelf leads with films and series you
+  have downloaded but not watched, best match first; only when there are too few is
+  it topped up with suggestions that still have to be fetched.
+- **More taste signals**: Jellyfin favourites, Seerr requests, Trakt watchlist and
+  AniList favourites and plan-to-watch now shape the picks, each weighted for how much
+  it says.
+- **Adult discovery** (Discover → Adult, only with 18+ on): streaming-style shelves —
+  top picks, new from your StashDB favourites, more with the performers and from the
+  studios you follow, your recurring themes, trending — built from your Whisparr
+  library, StashDB favourites and what you open or turn down (*Not for me* on every
+  card). Typing a search or setting a filter swaps the shelves for results; clearing
+  it brings them back. Filters: tags (all of), excluded tags, performers, studios,
+  release dates, length and sort, with autocomplete from StashDB. Scene taste is kept
+  apart from film taste. The agent gets the same search as `adult_discover`.
+- Settings → Discovery: *Show adult downloads on the home page* (off by default).
+- `MAESTARR_ALLOW_ADULT=false` (environment only) locks the 18+ section off: the switch
+  disappears, saved settings are overruled, and the API refuses to turn it on.
+
 ### Changed
+- **The 18+ section left onboarding**: setup no longer mentions Whisparr, StashDB or the
+  switch. It lives at the bottom of Settings → Discovery and needs an age confirmation;
+  Whisparr and StashDB settings appear only once it is on, and the service status list
+  leaves them out while it is off.
+- With 18+ off, adult downloads (Whisparr's qBittorrent category, plus "adult",
+  "whisparr", "xxx") are hidden from the assistant — not listed, inspected or
+  removed — and XXX results are dropped from indexer searches.
+- The tag suggestions dropdown has a solid background.
 - A cancelled turn also lists the steps that were still running when it was stopped.
+
+### Fixed
+- Downloads no longer drop out of *Picks for tonight* after they were shown a few
+  times: only *Not for me* removes something you already have.
+- "Database is locked" errors (failed logins, chats that would not delete) while
+  suggestions were being recorded: the database now uses write-ahead logging and
+  shown suggestions are saved in one short write.
 
 ## [0.5.0] - 2026-10-15
 

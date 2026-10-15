@@ -33,6 +33,14 @@ logger = logging.getLogger(__name__)
 STATUS_TIMEOUT = 10.0
 
 
+def _seerr(s: Settings) -> Optional[Any]:
+    if not (s.SEERR_URL and secret(s.SEERR_API_KEY)):
+        return None
+    from maestarr.clients.seerr import SeerrMetadataClient
+
+    return SeerrMetadataClient(s.SEERR_URL, secret(s.SEERR_API_KEY) or "")
+
+
 def metadata_client(s: Settings) -> Optional[TmdbClient]:
     """TMDB itself when a key is set, otherwise Seerr standing in for it."""
     from maestarr.language import metadata_code
@@ -66,6 +74,7 @@ class Services:
     anilist: Optional[AniListClient] = None
     trakt: Optional[TraktClient] = None
     stashdb: Optional[StashDbClient] = None
+    seerr: Optional[Any] = None  # SeerrMetadataClient — requests are a taste signal
     resolver: ReleaseResolver = field(init=False)
     # Releases seen in recent searches (guid → candidate) and their latest
     # assessment; a grab must name a release the user has actually seen.
@@ -117,6 +126,7 @@ class Services:
             omdb=OmdbClient(secret(s.OMDB_API_KEY) or "") if secret(s.OMDB_API_KEY) else None,
             anilist=AniListClient(s.data_dir),
             trakt=TraktClient(secret(s.TRAKT_CLIENT_ID) or "") if secret(s.TRAKT_CLIENT_ID) else None,
+            seerr=_seerr(s),
             stashdb=StashDbClient(s.STASHDB_URL, secret(s.STASHDB_API_KEY) or "")
             if s.MAESTARR_ADULT_CONTENT and s.STASHDB_ENABLED and secret(s.STASHDB_API_KEY)
             else None,
@@ -199,7 +209,7 @@ class Services:
             c
             for c in (
                 self.sonarr, self.radarr, self.whisparr, self.prowlarr, self.qbittorrent, self.jellyfin,
-                self.tmdb, self.omdb, self.anilist, self.trakt, self.stashdb,
+                self.tmdb, self.omdb, self.anilist, self.trakt, self.stashdb, self.seerr,
             )
             if c is not None
         ]
@@ -211,15 +221,9 @@ class Services:
         """Reachability of every integration (used by `doctor` and the UI)."""
 
         adult_off = not self.settings.MAESTARR_ADULT_CONTENT
-        adult_saved = {
-            "whisparr": bool(self.settings.WHISPARR_URL),
-            "stashdb": bool(self.settings.STASHDB_ENABLED and secret(self.settings.STASHDB_API_KEY)),
-        }
 
         async def check(name: str, client: Optional[HttpService], probe: Any) -> ServiceStatus:
             if client is None:
-                if adult_off and adult_saved.get(name):
-                    return ServiceStatus(name=name, configured=False, detail="18+ off")
                 return ServiceStatus(name=name, configured=False)
             try:
                 # A status page must answer quickly even when a service is crawling.
@@ -246,7 +250,10 @@ class Services:
             check("anilist", self.anilist, lambda: _const("public API")),
             check("stashdb", self.stashdb, lambda: _const("enabled")),
         ]
-        return list(await asyncio.gather(*checks))
+        result = list(await asyncio.gather(*checks))
+        if adult_off:  # the 18+ services are not mentioned at all while the switch is off
+            result = [r for r in result if r.name not in ("whisparr", "stashdb")]
+        return result
 
 
 async def _const(value: str) -> str:

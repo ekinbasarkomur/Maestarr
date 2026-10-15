@@ -95,7 +95,9 @@ async def find_releases(
 
 async def search_indexers(svc: Services, query: str, kind: str = "any", limit: int = 25) -> dict[str, Any]:
     """Free-text search across all Prowlarr indexers (packs the apps cannot map)."""
-    releases = await svc.need_prowlarr().search(query, kind=kind, limit=100)
+    releases = await svc.need_prowlarr().search(
+        query, kind=kind, limit=100, exclude_adult=not svc.settings.MAESTARR_ADULT_CONTENT
+    )
     _remember(svc, releases)
     ordered = sorted(releases, key=lambda r: -(r.seeders or 0))
     return {"total": len(releases), "releases": [_brief(r) for r in ordered[:limit]]}

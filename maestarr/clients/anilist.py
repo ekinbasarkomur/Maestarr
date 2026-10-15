@@ -59,6 +59,14 @@ query ($user: String) {
   }
 }"""
 
+USER_INTEREST_QUERY = """
+query ($user: String) {
+  User(name: $user) { favourites { anime(perPage: 50) { nodes { id seasonYear title { romaji english } } } } }
+  MediaListCollection(userName: $user, type: ANIME, status_in: [PLANNING]) {
+    lists { entries { media { id seasonYear title { romaji english } } } }
+  }
+}"""
+
 FRIBB_URL = "https://raw.githubusercontent.com/Fribb/anime-lists/master/anime-list-full.json"
 
 
@@ -110,6 +118,21 @@ class AniListClient(HttpService):
                         play_count=1 + int(entry.get("repeat") or 0),
                     )
                 )
+        return events
+
+    async def user_interest(self, user: str) -> list[WatchEvent]:
+        """Favourites (strong) and the plan-to-watch list (weak)."""
+        data = await self.query(USER_INTEREST_QUERY, user=user)
+        favourites = ((((data.get("User") or {}).get("favourites") or {}).get("anime") or {}).get("nodes")) or []
+        planning = [e["media"] for lst in (data.get("MediaListCollection") or {}).get("lists") or [] for e in lst["entries"]]
+        events = []
+        for media, source in [(m, "favorite") for m in favourites] + [(m, "watchlist") for m in planning]:
+            ids = await self.mapped_ids(media["id"])
+            events.append(WatchEvent(
+                kind="anime", title=media["title"].get("english") or media["title"]["romaji"],
+                year=media.get("seasonYear"), tvdb_id=ids.get("tvdb_id"), tmdb_id=ids.get("tmdb_id"),
+                rating=9.5 if source == "favorite" else None, source=source,
+            ))
         return events
 
     async def to_ref(self, media: dict[str, Any]) -> MediaRef:

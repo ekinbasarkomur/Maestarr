@@ -163,9 +163,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     except Exception as exc:  # noqa: BLE001 — qBittorrent may simply be down
         logger.debug("probe cleanup skipped: %s", exc)
     await bot.sync()
+    from maestarr.refresh import scheduler
+
+    refresher = asyncio.create_task(scheduler(get_services), name="cache-refresh")
     manager = _mcp_manager()
     async with manager.run():
         yield
+    refresher.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await refresher
     await bot.stop()
     await reset_services()
 

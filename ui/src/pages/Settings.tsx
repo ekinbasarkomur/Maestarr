@@ -4,6 +4,7 @@ import { NavLink, useNavigate, useParams } from 'react-router'
 
 import { AdultSwitch } from '@/components/AdultSwitch'
 import { AiForm } from '@/components/AiForm'
+import { CachingSettings } from '@/components/CachingSettings'
 import { LanguagePicker } from '@/components/LanguagePicker'
 import { useStatus } from '@/hooks/useStatus'
 import { ServiceCard, ServiceForm } from '@/components/ServiceForm'
@@ -43,6 +44,7 @@ export default function SettingsPage() {
   const navigate = useNavigate()
   const [sections, setSections] = useState<Sections | null>(null)
   const [apiTokenSet, setApiTokenSet] = useState(false)
+  const [adultAllowed, setAdultAllowed] = useState(false)
 
   useEffect(() => {
     api
@@ -50,6 +52,7 @@ export default function SettingsPage() {
       .then((r) => {
         setSections(r.sections)
         setApiTokenSet(Boolean(r.api_token_set))
+        setAdultAllowed(r.adult_allowed !== false)
       })
       .catch(() => setSections({}))
   }, [])
@@ -57,6 +60,9 @@ export default function SettingsPage() {
   useEffect(() => {
     if (!TABS.some((t) => t.id === tab)) navigate('/settings/general', { replace: true })
   }, [tab, navigate])
+
+  // Whisparr and StashDB only show once the 18+ switch is on.
+  const adultOn = Boolean(sections?.adult?.MAESTARR_ADULT_CONTENT)
 
   return (
     <div className="scroll-thin h-full overflow-y-auto">
@@ -91,6 +97,14 @@ export default function SettingsPage() {
                     <LanguagePicker sections={sections} onSaved={setSections} />
                   </Section>
                 )}
+                {tab === 'general' && (
+                  <Section
+                    title="Caching"
+                    subtitle="Faster pages: slow sources are read once and kept."
+                  >
+                    <CachingSettings sections={sections} onSaved={setSections} />
+                  </Section>
+                )}
                 {tab === 'general' && <GeneralTab />}
                 {tab === 'ai' && (
                   <Section
@@ -113,7 +127,13 @@ export default function SettingsPage() {
                   </Section>
                 )}
                 {tab === 'services' &&
-                  ['sonarr', 'radarr', 'qbittorrent', 'prowlarr', 'whisparr'].map((id) => (
+                  [
+                    'sonarr',
+                    'radarr',
+                    'qbittorrent',
+                    'prowlarr',
+                    ...(adultOn ? ['whisparr'] : []),
+                  ].map((id) => (
                     <ServiceCard
                       key={id}
                       def={SERVICES[id]}
@@ -122,7 +142,14 @@ export default function SettingsPage() {
                     />
                   ))}
                 {tab === 'discovery' &&
-                  ['seerr', 'tmdb', 'omdb', 'trakt', 'anilist', 'stashdb'].map((id) => (
+                  [
+                    'seerr',
+                    'tmdb',
+                    'omdb',
+                    'trakt',
+                    'anilist',
+                    ...(adultOn ? ['stashdb'] : []),
+                  ].map((id) => (
                     <ServiceCard
                       key={id}
                       def={SERVICES[id]}
@@ -130,7 +157,9 @@ export default function SettingsPage() {
                       onSaved={setSections}
                     />
                   ))}
-                {tab === 'discovery' && <AdultSwitch sections={sections} onSaved={setSections} />}
+                {tab === 'discovery' && adultAllowed && (
+                  <AdultSwitch sections={sections} onSaved={setSections} />
+                )}
                 {tab === 'telegram' && (
                   <Section title="Telegram" subtitle={SERVICES.telegram.tagline}>
                     <TelegramForm sections={sections} onSaved={setSections} />

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from maestarr.clients.base import ServiceError
 from maestarr.domain import GiB
 from maestarr.preferences import Preferences
 from maestarr.services import Services
@@ -11,9 +12,44 @@ from maestarr.services import Services
 _ACTIVE = {"downloading", "stalledDL", "metaDL", "forcedDL", "queuedDL", "checkingDL", "allocating"}
 
 
+DEFAULT_ADULT_CATEGORIES = {"adult", "whisparr", "xxx"}
+
+
+async def adult_categories(svc: Services) -> set[str]:
+    """qBittorrent categories that hold adult downloads: the usual names plus the
+    one Whisparr is configured with (learned while 18+ is on, remembered after)."""
+    from maestarr.cache import cached
+    from maestarr.ops.discovery import cache_store
+
+    learned: list[str] = []
+    if svc.whisparr and svc.settings.MAESTARR_ADULT_CONTENT:
+        async def learn() -> list[str]:
+            clients = await svc.whisparr.get_json("/api/v3/downloadclient")  # type: ignore[union-attr]
+            return sorted({
+                str(f.get("value")).lower() for c in clients or [] for f in c.get("fields", [])
+                if "ategory" in f.get("name", "") and f.get("value")
+            })
+        try:
+            learned = await cached(cache_store(svc), "data:adult_categories", max_age=24 * 3600, build=learn)
+        except ServiceError:
+            learned = []
+    else:
+        stored = await cache_store(svc).get("data:adult_categories")
+        learned = stored[1] if stored else []
+    return DEFAULT_ADULT_CATEGORIES | {c.lower() for c in learned}
+
+
+async def visible_torrents(svc: Services, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """With 18+ off, adult downloads do not exist as far as Maestarr is concerned."""
+    if svc.settings.MAESTARR_ADULT_CONTENT:
+        return items
+    hidden = await adult_categories(svc)
+    return [t for t in items if str(t.get("category") or "").lower() not in hidden]
+
+
 async def torrents(svc: Services, *, category: Optional[str] = None, only_active: bool = False, limit: int = 40) -> dict[str, Any]:
     qbit = svc.need_qbittorrent()
-    items = await qbit.torrents(category=category)
+    items = await visible_torrents(svc, await qbit.torrents(category=category))
     info = await qbit.transfer_info()
     rows = []
     for t in sorted(items, key=lambda t: -t.get("added_on", 0)):
@@ -44,7 +80,10 @@ async def torrents(svc: Services, *, category: Optional[str] = None, only_active
 
 
 async def torrent_files(svc: Services, info_hash: str, limit: int = 80) -> dict[str, Any]:
-    files = await svc.need_qbittorrent().files(info_hash)
+    qbit = svc.need_qbittorrent()
+    if not await visible_torrents(svc, await qbit.torrents(hashes=[info_hash])):
+        raise ServiceError("qbittorrent", "no such torrent")
+    files = await qbit.files(info_hash)
     return {
         "files": [
             {"index": f["index"], "name": f["name"], "size_gb": round(f["size"] / GiB, 2),
@@ -58,7 +97,7 @@ async def torrent_files(svc: Services, info_hash: str, limit: int = 80) -> dict[
 
 async def remove_torrents(svc: Services, hashes: list[str], *, delete_files: bool) -> dict[str, Any]:
     qbit = svc.need_qbittorrent()
-    found = await qbit.torrents(hashes=hashes)
+    found = await visible_torrents(svc, await qbit.torrents(hashes=hashes))
     if not found:
         return {"removed": 0, "reason": "no such torrents"}
     await qbit.delete(*[t["hash"] for t in found], delete_files=delete_files)

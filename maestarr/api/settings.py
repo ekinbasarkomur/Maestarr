@@ -40,7 +40,7 @@ SECTIONS: dict[str, list[str]] = {
     "trakt": ["TRAKT_CLIENT_ID", "TRAKT_USERNAME"],
     "anilist": ["ANILIST_USERNAME"],
     "letterboxd": ["LETTERBOXD_EXPORT"],
-    "adult": ["MAESTARR_ADULT_CONTENT"],
+    "adult": ["MAESTARR_ADULT_CONTENT", "MAESTARR_HOME_ADULT_DOWNLOADS"],
     "stashdb": ["STASHDB_ENABLED", "STASHDB_API_KEY"],
     "telegram": ["TELEGRAM_BOT_TOKEN", "TELEGRAM_ALLOWED_CHAT_IDS"],
     "proxy": [
@@ -49,6 +49,10 @@ SECTIONS: dict[str, list[str]] = {
         "MAESTARR_PROXY_BYPASS_LOCAL", "MAESTARR_PROXY_UDP_DIRECT",
     ],
     "general": ["MAESTARR_LANGUAGE"],
+    "caching": [
+        "MAESTARR_BACKGROUND_REFRESH", "MAESTARR_DATA_REFRESH_HOURS",
+        "MAESTARR_PICKS_REFRESH", "MAESTARR_PICKS_REFRESH_HOURS",
+    ],
     "behaviour": ["MAESTARR_ENRICH_TOP_N", "MAESTARR_PROBE_TIMEOUT", "MAESTARR_MIN_FREE_GB", "QBITTORRENT_PROBE_CATEGORY"],
 }
 EDITABLE = {f for fields in SECTIONS.values() for f in fields} | {"MAESTARR_SETUP_COMPLETE"}
@@ -119,13 +123,16 @@ async def apply_update(update: dict[str, Any]) -> Settings:
 @router.get("")
 async def read_settings(_: Any = Depends(require_setup_open)) -> dict[str, Any]:
     s = get_settings()
-    return {"sections": public_view(s), "setup_complete": s.MAESTARR_SETUP_COMPLETE, "api_token_set": bool(secret(s.MAESTARR_API_TOKEN))}
+    return {"sections": public_view(s), "setup_complete": s.MAESTARR_SETUP_COMPLETE,
+            "api_token_set": bool(secret(s.MAESTARR_API_TOKEN)), "adult_allowed": s.MAESTARR_ALLOW_ADULT}
 
 
 @router.put("")
 async def save_settings(body: SettingsUpdate, _: Any = Depends(require_setup_open)) -> dict[str, Any]:
+    if body.fields.get("MAESTARR_ADULT_CONTENT") and not get_settings().MAESTARR_ALLOW_ADULT:
+        raise HTTPException(status_code=403, detail="adult content is locked off on this server (MAESTARR_ALLOW_ADULT=false)")
     s = await apply_update(body.fields)
-    return {"sections": public_view(s), "setup_complete": s.MAESTARR_SETUP_COMPLETE}
+    return {"sections": public_view(s), "setup_complete": s.MAESTARR_SETUP_COMPLETE, "adult_allowed": s.MAESTARR_ALLOW_ADULT}
 
 
 @router.post("/complete-setup")

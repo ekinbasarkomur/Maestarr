@@ -10,10 +10,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import time
 from datetime import datetime, timezone
 from typing import Any, Awaitable, Optional
 
+from maestarr.cache import cached
 from maestarr.clients.base import ServiceError
 from maestarr.clients.tmdb import tmdb_kind
 from maestarr.domain import MediaKind, MediaRef
@@ -23,7 +23,6 @@ from maestarr.taste.recommend import taste_score
 
 logger = logging.getLogger(__name__)
 
-ROWS_TTL = 30 * 60
 UNWATCHED_AFTER_DAYS = 21
 GENERIC_TAGS = {"based on novel or book", "based on comic", "duringcreditsstinger", "aftercreditsstinger",
                 "woman director", "sequel", "remake", "anime", "live action remake", "biography"}
@@ -34,10 +33,28 @@ def _row(row_id: str, title: str, items: list[dict[str, Any]], subtitle: Optiona
 
 
 async def build_rows(svc: Services, *, refresh: bool = False) -> dict[str, Any]:
-    cached = svc.memo.get("rows")
-    if cached and not refresh and time.time() - cached[0] < ROWS_TTL:
-        return dict(cached[1])
+    """The shelves, cached for the picks refresh interval; titles the user has since
+    turned down (or that are not due) are filtered out at read time."""
     svc.need_tmdb()
+    store = discovery.cache_store(svc)
+    if refresh:
+        await store.drop("picks:rows")
+    out = await cached(store, "picks:rows", max_age=discovery.picks_age(svc), build=lambda: _build_rows(svc))
+    hidden = (await discovery.feedback_store(svc).state()).hidden
+    rows = []
+    for row in out["rows"]:
+        items = [i for i in row["items"] if not _hidden(i, hidden)]
+        if len(items) >= 3:
+            rows.append({**row, "items": items})
+    return {**out, "rows": rows}
+
+
+def _hidden(item: dict[str, Any], hidden: set[tuple[str, int]]) -> bool:
+    tmdb_id = item.get("tmdb_id")
+    return bool(tmdb_id) and (tmdb_kind(item.get("kind", "movie")), int(tmdb_id)) in hidden  # type: ignore[arg-type]
+
+
+async def _build_rows(svc: Services) -> dict[str, Any]:
     profile = await discovery.taste_profile(svc)
     state = await discovery.feedback_store(svc).state()
     watched = await discovery.watched_set(svc)
@@ -142,7 +159,6 @@ async def build_rows(svc: Services, *, refresh: bool = False) -> dict[str, Any]:
                         "subtitle": "Downloaded a while ago, not watched yet", "items": waiting})
     out = {"rows": rows, "tags": tags_for_filter(profile), "genres": profile.top("genres", 10),
            "based_on": [f"{s.title} ({s.year})" for s in profile.seeds[:4]]}
-    svc.memo["rows"] = (time.time(), out)
     return out
 
 
@@ -178,3 +194,47 @@ async def unwatched_in_library(svc: Services, limit: int = 14) -> list[dict[str,
                 r["rating"] = det.get("vote_average")
                 r["genres"] = [g["name"] for g in det.get("genres", [])]
     return out[:limit]
+
+
+READY_SCAN = 150  # how many of the newest unwatched downloads are scored
+
+
+async def ready_to_watch(svc: Services, tags: Optional[list[str]] = None, limit: int = 12) -> list[dict[str, Any]]:
+    """Downloaded titles not watched yet, best match for the user's taste first —
+    what "Picks for tonight" offers before anything that still has to be fetched."""
+    from maestarr.clients.tmdb import credits_people
+
+    profile = await discovery.taste_profile(svc)
+    watched = await discovery.watched_set(svc)
+    # Only "Not for me" hides a download: the spacing that rests ignored suggestions
+    # must not empty the shelf of things the user already chose to keep.
+    state = await discovery.feedback_store(svc).state()
+    turned_down = {(d["kind"], int(d["tmdb_id"])) for d in state.disliked}
+    _, ids = await discovery.library_index(svc)
+    library = await discovery.library_history(svc, limit=400)
+    candidates = [
+        ev for ev in library
+        if ev.tmdb_id and (tmdb_kind(ev.kind), ev.tmdb_id) not in watched
+        and (tmdb_kind(ev.kind), ev.tmdb_id) not in turned_down
+    ][:READY_SCAN]
+    cache = discovery._cache(svc)
+    details = await asyncio.gather(*(cache.details(tmdb_kind(ev.kind), ev.tmdb_id) for ev in candidates))  # type: ignore[arg-type]
+    wanted = {t.lower() for t in tags or []}
+    scored: list[tuple[float, dict[str, Any]]] = []
+    for ev, det in zip(candidates, details):
+        if not det:
+            continue
+        ref = await cache.tmdb.to_ref(tmdb_kind(ev.kind), det, anime=ev.kind == "anime")
+        if wanted and not wanted & {x.lower() for x in ref.keywords + ref.genres}:
+            continue
+        score, why = taste_score(ref, credits_people(det), profile)
+        ref.in_library = True
+        row = discovery._ref_out(ref)
+        row["match"] = round(score * 100)
+        row["why"] = ["downloaded, ready to watch", *why]
+        row["ready"] = True
+        if ev.kind == "movie" and ev.tmdb_id in ids["movie_by_tmdb"]:
+            row["movie_id"] = ids["movie_by_tmdb"][ev.tmdb_id]
+        scored.append((score, row))
+    scored.sort(key=lambda s: -s[0])
+    return [row for _, row in scored[:limit]]

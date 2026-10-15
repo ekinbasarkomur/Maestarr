@@ -1,4 +1,4 @@
-import { Check, ChevronLeft, ChevronRight, Film, Search, Sparkles, Star, Tv } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Film, Search, Sparkles, Star, Tv, X } from 'lucide-react'
 import { useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/primitives'
@@ -64,12 +64,15 @@ export function PickCardView({
   card: c,
   onSearch,
   onOpen,
+  onDismiss,
   className,
   label = 'Search',
 }: {
   card: PickCard
   onSearch: (c: PickCard) => void
   onOpen?: (c: PickCard) => void
+  /** "Not for me": hide this card and count its themes against similar ones. */
+  onDismiss?: (c: PickCard) => void
   className?: string
   label?: string
 }) {
@@ -83,7 +86,7 @@ export function PickCardView({
   return (
     <article
       className={cn(
-        'glass flex shrink-0 snap-start flex-col overflow-hidden rounded-2xl ring-1 ring-white/[0.08]',
+        'group/card glass flex shrink-0 snap-start flex-col overflow-hidden rounded-2xl ring-1 ring-white/[0.08]',
         className ?? (scene ? 'w-[300px]' : 'w-[220px]'),
       )}
     >
@@ -118,6 +121,20 @@ export function PickCardView({
             <Check className="size-3" />
             In library
           </span>
+        )}
+        {onDismiss && (
+          <button
+            type="button"
+            aria-label={`Not for me: ${c.title}`}
+            title="Not for me"
+            onClick={(e) => {
+              e.stopPropagation()
+              onDismiss(c)
+            }}
+            className="absolute top-2 right-2 z-10 flex size-7 items-center justify-center rounded-full bg-black/70 text-foreground ring-1 ring-white/20 backdrop-blur transition hover:bg-black/90 sm:hidden sm:group-hover/card:flex"
+          >
+            <X className="size-3.5" />
+          </button>
         )}
         {c.rating ? (
           <span className="absolute top-2 right-2 inline-flex items-center gap-1 rounded-full bg-black/65 px-2 py-0.5 text-[10px] font-medium backdrop-blur">

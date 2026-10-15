@@ -62,9 +62,10 @@ def rating_weight(rating: Optional[float]) -> float:
     return 0.25
 
 
-# A title the user added to Sonarr/Radarr but has not watched is a real, weaker
-# signal of taste than one they watched.
-LIBRARY_WEIGHT = 0.35
+# Not every signal is a watch. Owning, requesting or listing a title says less
+# than watching it; a favourite says more. Undated interest counts as fairly recent.
+SOURCE_WEIGHT = {"library": 0.35, "watchlist": 0.4, "request": 0.5, "favorite": 1.0}
+LIBRARY_WEIGHT = SOURCE_WEIGHT["library"]
 
 
 def event_weight(ev: WatchEvent, now: Optional[datetime] = None) -> float:
@@ -76,8 +77,9 @@ def event_weight(ev: WatchEvent, now: Optional[datetime] = None) -> float:
     >>> event_weight(watched, now), round(event_weight(added, now), 2)
     (1.0, 0.21)
     """
-    w = recency_weight(ev.watched_at, now) * rating_weight(ev.rating) * (math.log2(max(1, ev.play_count)) + 1)
-    return w * LIBRARY_WEIGHT if ev.source == "library" else w
+    recency = recency_weight(ev.watched_at, now) if ev.watched_at or ev.source not in SOURCE_WEIGHT else 0.75
+    w = recency * rating_weight(ev.rating) * (math.log2(max(1, ev.play_count)) + 1)
+    return w * SOURCE_WEIGHT.get(ev.source, 1.0)
 
 
 def merge_history(*sources: list[WatchEvent]) -> list[WatchEvent]:

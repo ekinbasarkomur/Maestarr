@@ -67,7 +67,7 @@ class FeedbackStore:
         self._ready = False
 
     async def _db(self) -> aiosqlite.Connection:
-        db = await aiosqlite.connect(self.path)
+        db = await aiosqlite.connect(self.path, timeout=30)
         db.row_factory = aiosqlite.Row
         if not self._ready:
             await db.executescript(SCHEMA)
@@ -78,29 +78,33 @@ class FeedbackStore:
     async def shown(self, items: Iterable[tuple[str, int, str]], now: Optional[float] = None) -> None:
         """Count an impression for each (kind, tmdb_id, title), at most once per sticky window."""
         now = now or time.time()
+        items = list(items)
         db = await self._db()
         try:
+            # Read everything first, then write in one short transaction: holding the
+            # write lock across many slow round trips blocked logins and chats.
+            async with db.execute("SELECT kind, tmdb_id, shown, last_shown, last_engaged FROM impressions") as cur:
+                known = {(r["kind"], int(r["tmdb_id"])): r for r in await cur.fetchall()}
+            writes = []
             for kind, tmdb_id, title in items:
-                async with db.execute(
-                    "SELECT shown, engaged, last_shown, last_engaged FROM impressions WHERE kind=? AND tmdb_id=?",
-                    (kind, tmdb_id),
-                ) as cur:
-                    row = await cur.fetchone()
+                row = known.get((kind, int(tmdb_id)))
                 if row and row["last_shown"] and now - row["last_shown"] < STICKY:
                     continue
                 shown = (row["shown"] if row else 0) + 1
                 # Engaged since it was last shown? Then it is not a "skip".
                 engaged_since = bool(row and row["last_engaged"] and row["last_engaged"] >= (row["last_shown"] or 0))
                 due = now + (2 * DAY if engaged_since else next_interval_days(shown) * DAY)
-                await db.execute(
+                writes.append((kind, tmdb_id, title, shown, now, due))
+            if writes:
+                await db.executemany(
                     """INSERT INTO impressions (kind, tmdb_id, title, shown, last_shown, next_due)
                        VALUES (?,?,?,?,?,?)
                        ON CONFLICT(kind, tmdb_id) DO UPDATE SET
                          shown=excluded.shown, last_shown=excluded.last_shown,
                          next_due=MAX(impressions.next_due, excluded.next_due), title=excluded.title""",
-                    (kind, tmdb_id, title, shown, now, due),
+                    writes,
                 )
-            await db.commit()
+                await db.commit()
         finally:
             await db.close()
 

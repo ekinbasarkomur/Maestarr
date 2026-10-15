@@ -5,15 +5,18 @@ import { Input } from '@/components/ui/primitives'
 import { api, type Suggestion } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
-/** Chips with autocomplete for tags (TMDB keywords) or people. */
+/** Chips with autocomplete for tags (TMDB keywords) or people, or any `suggest` source. */
 export function ChipInput({
   type,
+  suggest,
   values,
   onChange,
   placeholder,
   quick = [],
 }: {
   type: 'tag' | 'person'
+  /** Where suggestions come from instead of TMDB (e.g. StashDB). */
+  suggest?: (q: string) => Promise<Suggestion[]>
   values: string[]
   onChange: (values: string[]) => void
   placeholder: string
@@ -32,8 +35,8 @@ export function ChipInput({
     let alive = true
     const t = setTimeout(() => {
       setLoading(true)
-      api
-        .suggest(type, q)
+      const source = suggest ? suggest(q) : api.suggest(type, q)
+      source
         .then((h) => alive && setHits(h))
         .catch(() => alive && setHits([]))
         .finally(() => alive && setLoading(false))
@@ -42,6 +45,7 @@ export function ChipInput({
       alive = false
       clearTimeout(t)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `suggest` is a new function each render
   }, [text, type])
 
   useEffect(() => {
@@ -99,7 +103,7 @@ export function ChipInput({
         </div>
       </div>
       {open && text.trim().length >= 2 && hits.length > 0 && (
-        <ul className="glass absolute z-30 mt-1 max-h-64 w-full max-w-sm overflow-y-auto rounded-xl p-1 shadow-xl ring-1 ring-white/10">
+        <ul className="absolute z-30 mt-1 max-h-64 w-full max-w-sm overflow-y-auto rounded-xl bg-[#14161d] p-1 shadow-2xl shadow-black/60 ring-1 ring-white/15">
           {hits.map((h) => (
             <li key={h.id}>
               <button
