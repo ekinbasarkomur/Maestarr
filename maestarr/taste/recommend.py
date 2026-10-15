@@ -52,6 +52,8 @@ class RecommendRequest:
     min_rating: float = 6.0
     limit: int = 8
     include_owned: bool = True
+    # Must-have themes (TMDB keywords, e.g. "time travel"): every pick carries at least one.
+    tags: list[str] = field(default_factory=list)
 
 
 def dim_score(values: list[str], weights: dict[str, float]) -> Optional[float]:
@@ -81,6 +83,10 @@ def taste_score(ref: MediaRef, people: list[str], profile: TasteProfile) -> tupl
         return 0.0, []
     weight_sum = sum(WEIGHTS[k] for k in present)
     score = sum(WEIGHTS[k] * v for k, v in present.items()) / weight_sum
+    # Themes of titles the user turned down pull a match down.
+    avoided = dim_score(ref.keywords + ref.genres, profile.avoid)
+    if avoided:
+        score -= 0.3 * avoided
     why: list[str] = []
     shared_kw = [k for k in ref.keywords if k in profile.keywords][:4]
     if shared_kw:
@@ -116,6 +122,26 @@ async def resolve_mood(tmdb: TmdbClient, req: RecommendRequest) -> tuple[list[in
     return ids, names, genres
 
 
+async def resolve_keywords(tmdb: TmdbClient, words: list[str]) -> tuple[list[int], list[str]]:
+    """Keyword names → TMDB keyword ids (exact match preferred)."""
+    found = await asyncio.gather(*(tmdb.search_keywords(w) for w in words[:8]))
+    ids: list[int] = []
+    names: list[str] = []
+    for word, hits in zip(words, found):
+        for h in [h for h in hits if h["name"].lower() == word.lower()] or hits[:1]:
+            ids.append(h["id"])
+            names.append(h["name"])
+    return ids, names
+
+
+def has_tag(keywords: list[str], tags: set[str]) -> bool:
+    """
+    >>> has_tag(["Time Travel", "robot"], {"time travel"}), has_tag(["robot"], {"heist"}), has_tag([], set())
+    (True, False, True)
+    """
+    return not tags or any(k.lower() in tags for k in keywords)
+
+
 async def recommend(
     req: RecommendRequest,
     profile: TasteProfile,
@@ -123,10 +149,14 @@ async def recommend(
     *,
     owned: set[tuple[str, int]],
     watched: set[tuple[str, int]],
+    hidden: Optional[set[tuple[str, int]]] = None,
 ) -> list[Recommendation]:
     tmdb = cache.tmdb
     kind = tmdb_kind(req.kind)
+    hidden = hidden or set()
     mood_ids, mood_names, mood_genres = await resolve_mood(tmdb, req) if (req.mood or req.mood_keywords) else ([], [], [])
+    tag_ids, tag_names = await resolve_keywords(tmdb, req.tags) if req.tags else ([], [])
+    tag_set = {t.lower() for t in tag_names + req.tags}
     genre_ids = await tmdb.genre_ids(kind, req.genres or mood_genres or profile.top("genres", 3))
 
     date_key = "primary_release_date" if kind == "movie" else "first_air_date"
@@ -143,13 +173,21 @@ async def recommend(
         base_filters["with_original_language"] = req.language or "ja"
 
     calls = []
+    labels: list[str] = []
+    if tag_ids:
+        # Tags are a filter: draw candidates that carry them, best and most popular.
+        calls.append(tmdb.discover(kind, with_keywords="|".join(map(str, tag_ids)), **base_filters))
+        calls.append(tmdb.discover(kind, with_keywords="|".join(map(str, tag_ids)), sort_by="popularity.desc", **base_filters))
+        labels += ["tag", "tag"]
     if mood_ids:
         calls.append(tmdb.discover(kind, with_keywords="|".join(map(str, mood_ids)), **base_filters))
         calls.append(tmdb.discover(kind, with_keywords="|".join(map(str, mood_ids)), sort_by="popularity.desc", **base_filters))
-    if genre_ids:
+        labels += ["mood", "mood"]
+    if genre_ids and not tag_ids:
         g_filters = dict(base_filters)
         g_filters.setdefault("with_genres", "|".join(map(str, genre_ids)))
         calls.append(tmdb.discover(kind, **g_filters))
+        labels.append("genre")
     seed_details = [
         cache.details(kind, s.tmdb_id) for s in profile.seeds if s.tmdb_id and tmdb_kind(s.kind) == kind
     ][:8]
@@ -158,7 +196,7 @@ async def recommend(
 
     candidates: dict[int, dict[str, Any]] = {}
     origin: dict[int, set[str]] = {}
-    for pool, label in zip(pools, ["mood"] * (2 if mood_ids else 0) + (["genre"] if genre_ids else [])):
+    for pool, label in zip(pools, labels):
         for item in pool:
             candidates.setdefault(item["id"], item)
             origin.setdefault(item["id"], set()).add(label)
@@ -170,7 +208,7 @@ async def recommend(
                 candidates.setdefault(item["id"], item)
                 origin.setdefault(item["id"], set()).add(f"like {seed.title}")
 
-    pool_ids = [i for i in candidates if (kind, i) not in watched]
+    pool_ids = [i for i in candidates if (kind, i) not in watched and (kind, i) not in hidden]
     if not req.include_owned:
         pool_ids = [i for i in pool_ids if (kind, i) not in owned]
     # Cheap pre-score on genres/rating, then fetch details for the best 40.
@@ -187,8 +225,13 @@ async def recommend(
             continue
         if req.max_runtime and ref.runtime_minutes and ref.runtime_minutes > req.max_runtime:
             continue
+        if not has_tag(ref.keywords, tag_set):
+            continue
         people = credits_people(det)
         score, why = taste_score(ref, people, profile)
+        if tag_set:
+            tagged = [k for k in ref.keywords if k.lower() in tag_set]
+            why.insert(0, "tagged " + ", ".join(tagged[:3]))
         if mood_set:
             hits = [k for k in ref.keywords if k.lower() in mood_set]
             score += 0.25 * min(1.0, len(hits) / 2)

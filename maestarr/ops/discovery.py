@@ -15,6 +15,7 @@ from maestarr.clients.history_sources import letterboxd_export
 from maestarr.clients.tmdb import tmdb_kind
 from maestarr.domain import MediaKind, MediaRef, TasteProfile, WatchEvent
 from maestarr.services import Services
+from maestarr.taste.feedback import FeedbackState, FeedbackStore
 from maestarr.taste.profile import DetailsCache, build_profile, merge_history
 from maestarr.taste.recommend import RecommendRequest, recommend
 
@@ -125,16 +126,60 @@ async def recent_history(svc: Services, limit: int = 25) -> list[dict[str, Any]]
     ]
 
 
+def feedback_store(svc: Services) -> FeedbackStore:
+    store = svc.memo.get("feedback_store")
+    if store is None:
+        store = svc.memo["feedback_store"] = FeedbackStore(svc.settings.database_path)
+    return store
+
+
+async def taste_events(svc: Services) -> list[WatchEvent]:
+    """Everything that says something about taste: what was watched (and rated),
+    plus what was added to Sonarr/Radarr — the latter at a lower weight."""
+    cached = svc.memo.get("taste_events")
+    if cached and time.time() - cached[0] < HISTORY_TTL:
+        return list(cached[1])
+    watched = await watch_history(svc)
+    real = [e for e in watched if e.source != "library"]
+    library = await library_history(svc) if (svc.sonarr or svc.radarr) else []
+    events = merge_history(real, library)
+    svc.memo["taste_events"] = (time.time(), events)
+    return events
+
+
 async def taste_profile(svc: Services, refresh: bool = False) -> TasteProfile:
     cached = svc.memo.get("taste_profile")
     if cached and not refresh and time.time() - cached[0] < PROFILE_TTL:
         return cached[1]
-    history = await watch_history(svc)
+    history = await taste_events(svc)
     if not history:
         raise ServiceError("maestarr", "no watch history and an empty library — watch something in Jellyfin or connect Trakt/AniList")
     profile = await build_profile(history, _cache(svc))
+    apply_feedback(profile, await feedback_store(svc).state())
     svc.memo["taste_profile"] = (time.time(), profile)
     return profile
+
+
+def apply_feedback(profile: TasteProfile, state: FeedbackState) -> None:
+    """Titles the user opened or searched pull their themes up; "not for me"
+    titles push theirs down.
+
+    >>> p = TasteProfile(keywords={"heist": 0.4}, genres={"Crime": 1.0})
+    >>> apply_feedback(p, FeedbackState(liked=[{"keywords": ["heist", "twist"], "genres": ["Crime"]}],
+    ...                                 disliked=[{"keywords": ["gore"], "genres": ["Horror"]}]))
+    >>> p.keywords["heist"], p.keywords["twist"], p.avoid
+    (0.9, 0.5, {'gore': 1.0, 'Horror': 0.3})
+    """
+    for item in state.liked:
+        for k in item.get("keywords") or []:
+            profile.keywords[k] = round(profile.keywords.get(k, 0.0) + 0.5, 3)
+        for g in item.get("genres") or []:
+            profile.genres[g] = round(profile.genres.get(g, 0.0) + 0.25, 3)
+    for item in state.disliked:
+        for k in item.get("keywords") or []:
+            profile.avoid[k] = 1.0
+        for g in item.get("genres") or []:
+            profile.avoid.setdefault(g, 0.3)
 
 
 def profile_summary(p: TasteProfile) -> dict[str, Any]:
@@ -234,23 +279,20 @@ async def recommendations(
     min_rating: float = 6.0,
     limit: int = 8,
     include_owned: bool = True,
+    tags: Optional[list[str]] = None,
 ) -> dict[str, Any]:
     svc.need_tmdb()  # fail fast: reading history can take a minute on a busy Jellyfin
     profile = await taste_profile(svc)
     owned, ids = await library_index(svc)
-    history = await watch_history(svc)
+    watched = await watched_set(svc)
     cache = _cache(svc)
-    watched: set[tuple[str, int]] = set()
-    resolved = await asyncio.gather(*(cache.resolve(e) for e in history[:300]))
-    for pair in resolved:
-        if pair:
-            watched.add(pair)
+    state = await feedback_store(svc).state()
     req = RecommendRequest(
         kind=kind, mood=mood, mood_keywords=mood_keywords or [], genres=genres or [],
         year_from=year_from, year_to=year_to, language=language, max_runtime=max_runtime,
-        min_rating=min_rating, limit=limit, include_owned=include_owned,
+        min_rating=min_rating, limit=limit, include_owned=include_owned, tags=tags or [],
     )
-    recs = await recommend(req, profile, cache, owned=owned, watched=watched)
+    recs = await recommend(req, profile, cache, owned=owned, watched=watched, hidden=state.hidden)
     await _imdb(svc, [r.item for r in recs])
     rows = []
     for r in recs:
@@ -261,6 +303,45 @@ async def recommendations(
             row["movie_id"] = ids["movie_by_tmdb"][r.item.tmdb_id]
         rows.append(row)
     return {"based_on": profile_summary(profile)["anchor_titles"][:5], "recommendations": rows}
+
+
+async def watched_set(svc: Services) -> set[tuple[str, int]]:
+    """(tmdb kind, tmdb id) of everything actually watched (not merely owned)."""
+    cached = svc.memo.get("watched_set")
+    if cached and time.time() - cached[0] < HISTORY_TTL:
+        return set(cached[1])
+    history = [e for e in await watch_history(svc) if e.source != "library"]
+    cache = _cache(svc)
+    resolved = await asyncio.gather(*(cache.resolve(e) for e in history[:300]))
+    out = {pair for pair in resolved if pair}
+    svc.memo["watched_set"] = (time.time(), out)
+    return out
+
+
+async def record_impressions(svc: Services, items: list[dict[str, Any]]) -> None:
+    """Count these suggestions as shown (for spacing out the ones that are ignored)."""
+    rows = [(tmdb_kind(i.get("kind", "movie")), int(i["tmdb_id"]), str(i.get("title") or ""))
+            for i in items if i.get("tmdb_id") and i.get("kind") != "scene"]
+    if rows:
+        try:
+            await feedback_store(svc).shown(rows)
+        except Exception:  # noqa: BLE001 — bookkeeping must never break a page
+            logger.exception("could not record impressions")
+
+
+async def react(svc: Services, kind: str, tmdb_id: int, action: str, title: Optional[str] = None) -> dict[str, Any]:
+    """The user opened, searched, added or turned down a suggestion."""
+    genres: Optional[list[str]] = None
+    keywords: Optional[list[str]] = None
+    k = tmdb_kind(kind)  # type: ignore[arg-type]
+    if svc.tmdb:
+        det = await _cache(svc).details(k, tmdb_id)
+        if det:
+            ref = await svc.tmdb.to_ref(k, det)
+            genres, keywords, title = ref.genres, ref.keywords[:20], title or ref.title
+    await feedback_store(svc).react(k, tmdb_id, action, title=title, genres=genres, keywords=keywords)  # type: ignore[arg-type]
+    svc.memo.pop("taste_profile", None)  # the next picks use the new signal
+    return {"ok": True, "kind": k, "tmdb_id": tmdb_id, "action": action}
 
 
 async def adult_search(svc: Services, query: str, what: Literal["scenes", "performers"] = "scenes") -> list[dict[str, Any]]:

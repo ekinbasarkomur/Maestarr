@@ -599,6 +599,7 @@ async def recommend(
     min_rating: float = 6.0,
     limit: int = 8,
     include_owned: bool = True,
+    tags: Optional[list[str]] = None,
 ) -> dict[str, Any]:
     """Personal recommendations from the user's watch history, optionally for a mood.
     Translate the user's mood into concrete TMDB-style theme keywords in `mood_keywords`
@@ -616,11 +617,12 @@ async def recommend(
         min_rating: Minimum TMDB rating (0-10).
         limit: Number of recommendations.
         include_owned: Include titles already in the library (marked in_library).
+        tags: Must-have themes (TMDB keywords, e.g. ["heist"]): every pick carries at least one.
     """
     return await discovery.recommendations(
         ctx.deps, kind=kind, mood=mood, mood_keywords=mood_keywords, genres=genres, year_from=year_from,
         year_to=year_to, language=language, max_runtime=max_runtime, min_rating=min_rating, limit=limit,
-        include_owned=include_owned,
+        include_owned=include_owned, tags=tags,
     )
 
 
@@ -633,6 +635,72 @@ async def adult_search(ctx: Ctx, query: str, what: Literal["scenes", "performers
         what: scenes or performers.
     """
     return await discovery.adult_search(ctx.deps, query, what)
+
+
+@tool("tmdb")
+async def discover_titles(
+    ctx: Ctx,
+    kind: Literal["movie", "series", "anime"] = "movie",
+    query: Optional[str] = None,
+    genres: Optional[list[str]] = None,
+    tags: Optional[list[str]] = None,
+    people: Optional[list[str]] = None,
+    year_from: Optional[int] = None,
+    year_to: Optional[int] = None,
+    min_rating: Optional[float] = None,
+    language: Optional[str] = None,
+    max_runtime: Optional[int] = None,
+    sort: Literal["relevance", "rating", "newest", "oldest"] = "relevance",
+    limit: int = 20,
+) -> dict[str, Any]:
+    """Search titles by any mix of text, tags (themes like "time travel", "heist"),
+    people (actors, directors), genres, years, minimum rating, original language and
+    runtime. Use for "films with X", "series about Y from the 90s", "best-rated
+    Korean thrillers"… Results say if a title is already in the library or watched.
+
+    Args:
+        kind: movie, series or anime.
+        query: Free text (a title or words in it).
+        genres: Genre names, e.g. ["Thriller", "Science Fiction"] (any of them).
+        tags: Theme keywords (any of them); use find_tags to see what exists.
+        people: Person names (all of them must be involved).
+        year_from: Earliest release year.
+        year_to: Latest release year.
+        min_rating: Minimum TMDB rating 0-10.
+        language: Original language code, e.g. "ko", "ja", "tr".
+        max_runtime: Maximum runtime in minutes.
+        sort: relevance (popularity), rating, newest or oldest.
+        limit: How many results (max 40).
+    """
+    from maestarr.ops.search import discover_titles as search
+
+    return await search(ctx.deps, kind=kind, query=query, genres=genres, tags=tags, people=people,
+                        year_from=year_from, year_to=year_to, min_rating=min_rating, language=language,
+                        max_runtime=max_runtime, sort=sort, limit=limit)
+
+
+@tool("tmdb")
+async def find_people(ctx: Ctx, name: str) -> list[dict[str, Any]]:
+    """Find actors, directors and writers by name, with what they are known for.
+
+    Args:
+        name: The person's name (partial is fine).
+    """
+    from maestarr.ops.search import find_people as people
+
+    return await people(ctx.deps, name)
+
+
+@tool("tmdb")
+async def find_tags(ctx: Ctx, word: str) -> list[dict[str, Any]]:
+    """The theme tags (TMDB keywords) matching a word, to use with discover_titles or recommend.
+
+    Args:
+        word: A theme, e.g. "heist", "time loop", "found family".
+    """
+    from maestarr.ops.search import find_tags as tags
+
+    return await tags(ctx.deps, word)
 
 
 @tool("stashdb")
@@ -660,7 +728,9 @@ async def show_recommendations(ctx: Ctx, picks: list[picks_ops.Pick]) -> dict[st
     Args:
         picks: The chosen items, best first, each with a one-sentence `why`.
     """
-    return await picks_ops.present(ctx.deps, picks)
+    out = await picks_ops.present(ctx.deps, picks)
+    await discovery.record_impressions(ctx.deps, out["cards"])
+    return out
 
 
 # --------------------------------------------------------------------------

@@ -9,6 +9,7 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from maestarr import __version__
 from maestarr.api.deps import require_user
@@ -138,14 +139,125 @@ async def queue(_: Any = Depends(require_user)) -> dict[str, Any]:
 
 @router.get("/recommendations")
 async def recommendations(
-    kind: str = "movie", mood: Optional[str] = None, limit: int = 12, _: Any = Depends(require_user)
+    kind: str = "movie",
+    mood: Optional[str] = None,
+    tags: Optional[str] = None,
+    limit: int = 12,
+    _: Any = Depends(require_user),
 ) -> Any:
-    from maestarr.ops.discovery import recommendations as recs
+    from maestarr.ops.discovery import recommendations as recs, record_impressions
 
+    svc = get_services()
     try:
-        return await recs(get_services(), kind=kind, mood=mood, limit=limit)  # type: ignore[arg-type]
+        out = await recs(svc, kind=kind, mood=mood, limit=limit,  # type: ignore[arg-type]
+                         tags=[t.strip() for t in (tags or "").split(",") if t.strip()])
     except ServiceError as exc:
         return JSONResponse({"detail": str(exc)}, status_code=503)
+    await record_impressions(svc, out["recommendations"])
+    return out
+
+
+@router.get("/discover/rows")
+async def discover_rows(refresh: bool = False, _: Any = Depends(require_user)) -> Any:
+    from maestarr.ops.discovery import record_impressions
+    from maestarr.taste.rows import build_rows
+
+    svc = get_services()
+    try:
+        out = await build_rows(svc, refresh=refresh)
+    except ServiceError as exc:
+        return JSONResponse({"detail": str(exc)}, status_code=503)
+    await record_impressions(svc, [i for row in out["rows"] for i in row["items"][:8]])
+    return out
+
+
+@router.get("/discover/taste")
+async def discover_taste(_: Any = Depends(require_user)) -> Any:
+    """The user's strongest tags, genres and people — quick filters for picks and search."""
+    from maestarr.ops.discovery import taste_profile
+    from maestarr.taste.rows import tags_for_filter
+
+    try:
+        p = await taste_profile(get_services())
+    except ServiceError as exc:
+        return JSONResponse({"detail": str(exc).split(": ", 1)[-1]}, status_code=503)
+    return {"tags": tags_for_filter(p), "genres": p.top("genres", 10), "people": p.top("people", 8)}
+
+
+@router.get("/discover/search")
+async def discover_search(
+    kind: str = "movie",
+    query: Optional[str] = None,
+    genres: Optional[str] = None,
+    tags: Optional[str] = None,
+    people: Optional[str] = None,
+    year_from: Optional[int] = None,
+    year_to: Optional[int] = None,
+    min_rating: Optional[float] = None,
+    language: Optional[str] = None,
+    max_runtime: Optional[int] = None,
+    sort: str = "relevance",
+    limit: int = 30,
+    _: Any = Depends(require_user),
+) -> Any:
+    from maestarr.ops.search import discover_titles
+
+    def split(v: Optional[str]) -> Optional[list[str]]:
+        return [x.strip() for x in v.split(",") if x.strip()] if v else None
+
+    try:
+        return await discover_titles(
+            get_services(), kind=kind, query=query or None, genres=split(genres), tags=split(tags),  # type: ignore[arg-type]
+            people=split(people), year_from=year_from, year_to=year_to, min_rating=min_rating,
+            language=language or None, max_runtime=max_runtime, sort=sort, limit=limit,  # type: ignore[arg-type]
+        )
+    except ServiceError as exc:
+        return JSONResponse({"detail": str(exc).split(": ", 1)[-1]}, status_code=503)
+
+
+@router.get("/discover/suggest")
+async def discover_suggest(type: str, q: str, _: Any = Depends(require_user)) -> Any:
+    from maestarr.ops.search import find_people, find_tags
+
+    if len(q.strip()) < 2:
+        return []
+    try:
+        if type == "person":
+            return await find_people(get_services(), q.strip(), limit=8)
+        return await find_tags(get_services(), q.strip(), limit=10)
+    except ServiceError as exc:
+        return JSONResponse({"detail": str(exc).split(": ", 1)[-1]}, status_code=503)
+
+
+@router.get("/discover/genres")
+async def discover_genres(kind: str = "movie", _: Any = Depends(require_user)) -> Any:
+    from maestarr.clients.tmdb import tmdb_kind
+
+    try:
+        names = await get_services().need_tmdb().genres(tmdb_kind(kind))  # type: ignore[arg-type]
+    except ServiceError as exc:
+        return JSONResponse({"detail": str(exc).split(": ", 1)[-1]}, status_code=503)
+    return sorted(names.values())
+
+
+class Feedback(BaseModel):
+    kind: str
+    tmdb_id: int
+    action: str  # open | search | add | dismiss
+    title: Optional[str] = None
+
+
+@router.post("/feedback")
+async def feedback(body: Feedback, _: Any = Depends(require_user)) -> Any:
+    """The user opened, searched, added or turned down a suggestion."""
+    from maestarr.ops.discovery import react
+
+    if body.action not in ("open", "search", "add", "dismiss"):
+        return JSONResponse({"detail": "unknown action"}, status_code=400)
+    svc = get_services()
+    out = await react(svc, body.kind, body.tmdb_id, body.action, body.title)
+    svc.memo.pop("rows", None)
+    return out
 
 
 @router.get("/details")

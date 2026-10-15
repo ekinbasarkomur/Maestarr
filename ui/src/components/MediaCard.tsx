@@ -1,4 +1,4 @@
-import { Check, Film, Star, Tv } from 'lucide-react'
+import { Check, Film, Star, Tv, X } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 
@@ -38,6 +38,7 @@ export function MediaTile({
   inLibrary,
   footer,
   onClick,
+  onDismiss,
 }: {
   title: string
   year?: number
@@ -47,6 +48,8 @@ export function MediaTile({
   inLibrary?: boolean
   footer?: React.ReactNode
   onClick?: () => void
+  /** "Not for me": hide this title and count its themes against similar ones. */
+  onDismiss?: () => void
 }) {
   const Icon = kind === 'movie' ? Film : Tv
   return (
@@ -67,6 +70,27 @@ export function MediaTile({
             <span className="absolute top-2 left-2 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-success backdrop-blur">
               <Check className="size-3" />
               In library
+            </span>
+          )}
+          {onDismiss && (
+            <span
+              role="button"
+              tabIndex={0}
+              aria-label={`Not for me: ${title}`}
+              title="Not for me"
+              onClick={(e) => {
+                e.stopPropagation()
+                onDismiss()
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.stopPropagation()
+                  onDismiss()
+                }
+              }}
+              className="absolute top-2 right-2 z-10 hidden size-6 items-center justify-center rounded-full bg-black/70 text-foreground ring-1 ring-white/20 backdrop-blur transition group-hover:flex hover:bg-black/90"
+            >
+              <X className="size-3.5" />
             </span>
           )}
           {rating ? (

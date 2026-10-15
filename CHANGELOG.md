@@ -7,6 +7,27 @@ change behaviour.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-15
+
+### Added
+- **Shelves like a streaming app** on the home page and Discover → *For you*: top
+  picks, series for you, "Because you watched …", "More with <favourite person>",
+  "<Movies/Series> about <favourite theme>", and "Waiting in your library" (downloaded
+  weeks ago, never watched).
+- **Smarter picks**: the taste profile now also counts what you add to Sonarr/Radarr
+  (at a lower weight than what you watch) and what you open or search in Maestarr.
+  Suggestions you keep scrolling past come back less and less often (1, 2, 4, 8 … up
+  to 60 days); **Not for me** on any tile hides a title for a year and counts its
+  themes against similar ones.
+- **Tag filters**: one-tap chips of your strongest themes on "Picks for tonight" and in
+  Discover, plus a tag search with autocomplete; tagged picks always carry the tag.
+- **Detailed search** in Discover (Movies / Series / Anime): text, tags, people (with
+  autocomplete), genres, year range, minimum rating, original language, runtime and
+  sort.
+- The assistant gets the same search: `discover_titles`, `find_people`, `find_tags`,
+  and `recommend` accepts tags.
+
+
 ## [0.4.3] - 2026-10-15
 
 ### Added
@@ -107,7 +128,8 @@ The first public release.
 - Long release searches are allowed up to 30 minutes, with a clear message.
 - A chat that contained a "thinking" reply no longer fails on the next message.
 
-[Unreleased]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.4.3...HEAD
+[Unreleased]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.4.3...v0.5.0
 [0.4.3]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.4.0...v0.4.1

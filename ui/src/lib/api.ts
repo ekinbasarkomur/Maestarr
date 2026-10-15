@@ -144,6 +144,7 @@ export interface MediaRef {
   imdb_rating?: number
   poster_url?: string
   in_library?: boolean
+  watched?: boolean
   runtime_minutes?: number
   match?: number
   why?: string[]
@@ -153,6 +154,63 @@ export interface MediaRef {
 export interface Recommendations {
   based_on: string[]
   recommendations: MediaRef[]
+}
+
+export type FeedbackAction = 'open' | 'search' | 'add' | 'dismiss'
+
+export interface DiscoverRow {
+  id: string
+  title: string
+  subtitle?: string | null
+  items: MediaRef[]
+}
+
+export interface DiscoverRows {
+  rows: DiscoverRow[]
+  tags: string[]
+  genres: string[]
+  based_on: string[]
+}
+
+export interface SearchParams {
+  kind: string
+  query?: string
+  genres?: string[]
+  tags?: string[]
+  people?: string[]
+  year_from?: number
+  year_to?: number
+  min_rating?: number
+  language?: string
+  max_runtime?: number
+  sort?: 'relevance' | 'rating' | 'newest' | 'oldest'
+  limit?: number
+}
+
+export interface SearchResults {
+  kind: string
+  query?: string | null
+  applied: { genres?: string[]; tags?: string[]; people?: string[] }
+  results: MediaRef[]
+}
+
+export interface Suggestion {
+  id: number
+  name: string
+  department?: string | null
+  known_for?: string[]
+  image?: string | null
+}
+
+/** Query string from an object, skipping empty values. */
+export function qs(params: Record<string, unknown>): string {
+  return new URLSearchParams(
+    Object.entries(params)
+      .filter(
+        ([, v]) => v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && !v.length),
+      )
+      .map(([k, v]) => [k, String(v)]),
+  ).toString()
 }
 
 export interface DetailsQuery {
@@ -247,10 +305,27 @@ export const api = {
 
   status: () => get<StatusResponse>('/api/status'),
   overview: () => get<Overview>('/api/overview'),
-  recommendations: (kind: string, mood?: string) =>
+  recommendations: (kind: string, mood?: string, tags?: string[]) =>
     get<Recommendations>(
-      `/api/recommendations?kind=${kind}${mood ? `&mood=${encodeURIComponent(mood)}` : ''}`,
+      `/api/recommendations?${qs({ kind, mood, tags: tags?.length ? tags.join(',') : undefined })}`,
     ),
+  rows: (refresh = false) =>
+    get<DiscoverRows>(`/api/discover/rows${refresh ? '?refresh=true' : ''}`),
+  search: (params: SearchParams) =>
+    get<SearchResults>(
+      `/api/discover/search?${qs({
+        ...params,
+        genres: params.genres?.join(','),
+        tags: params.tags?.join(','),
+        people: params.people?.join(','),
+      })}`,
+    ),
+  suggest: (type: 'tag' | 'person', q: string) =>
+    get<Suggestion[]>(`/api/discover/suggest?${qs({ type, q })}`),
+  genres: (kind: string) => get<string[]>(`/api/discover/genres?${qs({ kind })}`),
+  taste: () => get<{ tags: string[]; genres: string[]; people: string[] }>('/api/discover/taste'),
+  feedback: (body: { kind: string; tmdb_id: number; action: FeedbackAction; title?: string }) =>
+    send<{ ok: boolean }>('POST', '/api/feedback', body),
   details: (params: DetailsQuery) =>
     get<TitleDetails>(
       `/api/details?${new URLSearchParams(

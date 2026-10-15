@@ -37,6 +37,7 @@ _DISCOVER = {
     "primary_release_date.lte": "primaryReleaseDateLte",
     "first_air_date.gte": "firstAirDateGte",
     "first_air_date.lte": "firstAirDateLte",
+    "with_watch_providers": "watchProviders",
 }
 
 
@@ -142,6 +143,14 @@ class SeerrMetadataClient(TmdbClient):
         path = "/discover/movies" if kind == "movie" else "/discover/tv"
         data = await self.get_json(path, **params)
         return snake((data or {}).get("results", []))
+
+    async def search_people(self, query: str) -> list[dict[str, Any]]:
+        data = await self.get_json("/search", query=query, page=1, language=self.language)
+        return [snake(r) for r in (data or {}).get("results", []) if r.get("mediaType") == "person"]
+
+    async def person_credits(self, person_id: int) -> dict[str, Any]:
+        data = await self.get_json(f"/person/{person_id}/combined_credits", language=self.language)
+        return snake(data or {})
 
     async def find(self, external_id: str, source: Literal["imdb_id", "tvdb_id"]) -> dict[str, Any]:
         """Seerr has no /find; search by the id where it can, else report nothing."""

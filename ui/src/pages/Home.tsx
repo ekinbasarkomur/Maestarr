@@ -2,12 +2,19 @@ import { ArrowRight, HardDrive, Loader2, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 
-import { DetailsModal, type DetailsTarget } from '@/components/DetailsModal'
+import { type DetailsTarget } from '@/components/DetailsModal'
 import { MediaTile } from '@/components/MediaCard'
+import { Shelf } from '@/components/Shelf'
 import { Badge, Button, Panel } from '@/components/ui/primitives'
-import { api, type Overview, type Recommendations } from '@/lib/api'
+import {
+  api,
+  type DiscoverRows,
+  type MediaRef,
+  type Overview,
+  type Recommendations,
+} from '@/lib/api'
 import { useAuth } from '@/lib/auth-context'
-import { detailsToCard, searchPrompt } from '@/lib/picks'
+import { sendFeedback, targetFrom, useDetails } from '@/lib/useDetails'
 import { cn } from '@/lib/utils'
 
 const SUGGESTIONS = [
@@ -33,7 +40,10 @@ export default function HomePage() {
   const [picks, setPicks] = useState<Recommendations | null>(null)
   const [picksError, setPicksError] = useState<string | null>(null)
   const [prompt, setPrompt] = useState('')
-  const [details, setDetails] = useState<DetailsTarget | null>(null)
+  const [tags, setTags] = useState<string[]>([])
+  const [taste, setTaste] = useState<string[]>([])
+  const [shelves, setShelves] = useState<DiscoverRows | null>(null)
+  const [hidden, setHidden] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     let alive = true
@@ -49,34 +59,50 @@ export default function HomePage() {
         .catch(() => alive && setOverview(null))
     void load()
     api
-      .recommendations('movie')
-      .then(setPicks)
-      .catch((e) => setPicksError((e as Error).message))
+      .taste()
+      .then((t) => alive && setTaste(t.tags))
+      .catch(() => undefined)
+    api
+      .rows()
+      .then((r) => alive && setShelves(r))
+      .catch(() => undefined)
     return () => {
       alive = false
       clearTimeout(timer)
     }
   }, [])
 
+  // Picks for tonight, filtered by the chosen tags.
+  const tagKey = tags.join(',')
+  useEffect(() => {
+    let alive = true
+    api
+      .recommendations('movie', undefined, tagKey ? tagKey.split(',') : undefined)
+      .then((p) => {
+        if (!alive) return
+        setPicks(p)
+        setPicksError(null)
+      })
+      .catch((e) => alive && setPicksError((e as Error).message))
+    return () => {
+      alive = false
+    }
+  }, [tagKey])
+
   const ask = (text: string) => {
     if (!text.trim()) return
     navigate('/chat', { state: { prompt: text.trim() } })
   }
+  const details = useDetails(ask)
+  const dismiss = (r: MediaRef) => {
+    sendFeedback(r.kind, r.tmdb_id, 'dismiss', r.title)
+    setHidden((h) => new Set(h).add(`${r.kind}-${r.tmdb_id}`))
+  }
+  const visible = (r: MediaRef) => !hidden.has(`${r.kind}-${r.tmdb_id}`)
 
   return (
     <div className="scroll-thin h-full overflow-y-auto">
-      {details && (
-        <DetailsModal
-          target={details}
-          onClose={() => setDetails(null)}
-          onGet={(d) => ask(searchPrompt(detailsToCard(d)))}
-          onAsk={(d) =>
-            ask(
-              `Tell me more about ${d.title}${d.year ? ` (${d.year})` : ''} — is it right for me?`,
-            )
-          }
-        />
-      )}
+      {details.modal}
       <div className="mx-auto max-w-6xl space-y-10 px-5 py-10 sm:px-8">
         <section className="space-y-5">
           <div>
@@ -212,6 +238,28 @@ export default function HomePage() {
               </Button>
             }
           />
+          {taste.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {taste.slice(0, 14).map((t) => {
+                const on = tags.includes(t)
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setTags((v) => (on ? v.filter((x) => x !== t) : [...v, t]))}
+                    className={cn(
+                      'rounded-full px-3 py-1 text-xs ring-1 transition',
+                      on
+                        ? 'bg-primary/15 text-primary ring-primary/40'
+                        : 'bg-white/[0.03] text-muted-foreground ring-white/[0.08] hover:text-foreground',
+                    )}
+                  >
+                    {t}
+                  </button>
+                )
+              })}
+            </div>
+          )}
           {!picks && !picksError && (
             <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
               <Loader2 className="size-4 animate-spin" />
@@ -233,31 +281,41 @@ export default function HomePage() {
           )}
           {picks && (
             <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6">
-              {picks.recommendations.slice(0, 12).map((r) => (
-                <MediaTile
-                  key={`${r.kind}-${r.tmdb_id}`}
-                  title={r.title}
-                  year={r.year}
-                  poster={r.poster_url}
-                  kind={r.kind}
-                  rating={r.imdb_rating ?? r.rating}
-                  inLibrary={r.in_library}
-                  onClick={() =>
-                    setDetails({
-                      kind: (r.kind === 'tv' ? 'series' : r.kind) as DetailsTarget['kind'],
-                      tmdb_id: r.tmdb_id,
-                      tvdb_id: r.tvdb_id,
-                      title: r.title,
-                      year: r.year,
-                      poster: r.poster_url,
-                      why: r.why?.[0],
-                    })
-                  }
-                />
-              ))}
+              {picks.recommendations
+                .filter(visible)
+                .slice(0, 12)
+                .map((r) => (
+                  <MediaTile
+                    onDismiss={() => dismiss(r)}
+                    key={`${r.kind}-${r.tmdb_id}`}
+                    title={r.title}
+                    year={r.year}
+                    poster={r.poster_url}
+                    kind={r.kind}
+                    rating={r.imdb_rating ?? r.rating}
+                    inLibrary={r.in_library}
+                    onClick={() => details.open(targetFrom(r))}
+                  />
+                ))}
             </div>
           )}
         </section>
+
+        {shelves && shelves.rows.length > 0 && (
+          <div className="space-y-10">
+            {shelves.rows
+              .filter((row) => row.id !== 'picks-movie')
+              .slice(0, 4)
+              .map((row) => (
+                <Shelf
+                  key={row.id}
+                  row={{ ...row, items: row.items.filter(visible) }}
+                  onOpen={(r) => details.open(targetFrom(r))}
+                  onDismiss={row.id === 'waiting' ? undefined : dismiss}
+                />
+              ))}
+          </div>
+        )}
 
         {overview && overview.recently_added.length > 0 && (
           <section>
@@ -272,7 +330,7 @@ export default function HomePage() {
                   kind={m.kind}
                   inLibrary
                   onClick={() =>
-                    setDetails({
+                    details.open({
                       kind: m.kind as DetailsTarget['kind'],
                       tmdb_id: m.tmdb_id,
                       tvdb_id: m.tvdb_id,

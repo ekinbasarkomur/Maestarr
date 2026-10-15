@@ -23,6 +23,7 @@ import {
 import { Badge, Button, Logo, Spinner } from '@/components/ui/primitives'
 import { api, type Conversation } from '@/lib/api'
 import { detailsToCard, type PickCard, searchPrompt } from '@/lib/picks'
+import { sendFeedback } from '@/lib/useDetails'
 import { cn } from '@/lib/utils'
 
 function newId() {
@@ -346,6 +347,7 @@ function ChatView({
           target={details}
           onClose={() => setDetails(null)}
           onGet={(d) => {
+            sendFeedback(d.kind, d.tmdb_id ?? details.tmdb_id, 'search', d.title)
             setDetails(null)
             send(searchPrompt(detailsToCard(d)))
           }}
@@ -372,7 +374,8 @@ function ChatView({
                     addToolApprovalResponse({ id: approvalId, approved })
                   }
                   onAsk={send}
-                  onOpen={(c) =>
+                  onOpen={(c) => {
+                    sendFeedback(c.kind, c.tmdb_id, 'open', c.title)
                     setDetails({
                       kind: c.kind,
                       tmdb_id: c.tmdb_id,
@@ -383,7 +386,7 @@ function ChatView({
                       poster: c.image,
                       why: c.why,
                     })
-                  }
+                  }}
                 />
               ))}
               {busy && (
@@ -607,7 +610,10 @@ function MessageRow({
                 <ToolActivity part={view} />
                 <PickCarousel
                   cards={output.cards as PickCard[]}
-                  onSearch={(c) => onAsk(searchPrompt(c))}
+                  onSearch={(c) => {
+                    sendFeedback(c.kind, c.tmdb_id, 'search', c.title)
+                    onAsk(searchPrompt(c))
+                  }}
                   onOpen={onOpen}
                 />
               </div>

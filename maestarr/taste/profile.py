@@ -62,8 +62,22 @@ def rating_weight(rating: Optional[float]) -> float:
     return 0.25
 
 
+# A title the user added to Sonarr/Radarr but has not watched is a real, weaker
+# signal of taste than one they watched.
+LIBRARY_WEIGHT = 0.35
+
+
 def event_weight(ev: WatchEvent, now: Optional[datetime] = None) -> float:
-    return recency_weight(ev.watched_at, now) * rating_weight(ev.rating) * (math.log2(max(1, ev.play_count)) + 1)
+    """
+    >>> from datetime import timedelta
+    >>> now = datetime(2026, 10, 14, tzinfo=timezone.utc)
+    >>> watched = WatchEvent(kind="movie", title="A", watched_at=now - timedelta(days=3), rating=9)
+    >>> added = WatchEvent(kind="movie", title="B", watched_at=now - timedelta(days=3), source="library")
+    >>> event_weight(watched, now), round(event_weight(added, now), 2)
+    (1.0, 0.21)
+    """
+    w = recency_weight(ev.watched_at, now) * rating_weight(ev.rating) * (math.log2(max(1, ev.play_count)) + 1)
+    return w * LIBRARY_WEIGHT if ev.source == "library" else w
 
 
 def merge_history(*sources: list[WatchEvent]) -> list[WatchEvent]:

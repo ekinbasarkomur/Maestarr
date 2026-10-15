@@ -54,6 +54,12 @@ without your approval.
   with moods — *melancholic*, *cozy*, *mind-bending* — TMDB metadata (through your
   Seerr, or your own TMDB key) and IMDb ratings. Titles you already own are flagged as an easy “watch tonight”. With no
   history yet, your Sonarr/Radarr library stands in for it.
+- **Shelves and smarter picks** — streaming-app style rows ("Because you watched…",
+  "More with…", "Waiting in your library"), built from what you watch, keep and open.
+  Suggestions you ignore come back less and less often; *Not for me* turns their
+  themes down. Filter picks by your own tags.
+- **Detailed search** — text, tags, people, genres, years, rating, language and
+  runtime, in Discover and for the assistant.
 - **Picks as cards** — when the assistant recommends something, the chat shows
   a swipeable row of cards: the poster Sonarr/Radarr use, a description, the
   reason it was picked, and a **Search** button that adds the title and judges

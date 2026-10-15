@@ -83,6 +83,14 @@ class TmdbClient(HttpService):
         data = await self.get_json(f"/discover/{kind}", **params)
         return data.get("results", [])
 
+    async def search_people(self, query: str) -> list[dict[str, Any]]:
+        data = await self.get_json("/search/person", query=query, include_adult="false", language=self.language)
+        return data.get("results", [])
+
+    async def person_credits(self, person_id: int) -> dict[str, Any]:
+        """{cast: [...], crew: [...]} across movies and series (media_type on each)."""
+        return await self.get_json(f"/person/{person_id}/combined_credits", language=self.language)
+
     async def find(self, external_id: str, source: Literal["imdb_id", "tvdb_id"]) -> dict[str, Any]:
         return await self.get_json(f"/find/{external_id}", external_source=source)
 

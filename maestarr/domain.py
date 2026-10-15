@@ -227,6 +227,8 @@ class TasteProfile(BaseModel):
     languages: dict[str, float] = Field(default_factory=dict)
     decades: dict[str, float] = Field(default_factory=dict)
     people: dict[str, float] = Field(default_factory=dict)
+    # Themes of titles the user said "not for me" to; they count against a match.
+    avoid: dict[str, float] = Field(default_factory=dict)
     seeds: list[MediaRef] = Field(default_factory=list)  # top titles used as seeds
     history_size: int = 0
     built_at: datetime = Field(default_factory=utcnow)
