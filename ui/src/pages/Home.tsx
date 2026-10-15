@@ -77,7 +77,7 @@ export default function HomePage() {
   useEffect(() => {
     let alive = true
     api
-      .recommendations('movie', undefined, tagKey ? tagKey.split(',') : undefined)
+      .tonight(tagKey ? tagKey.split(',') : undefined)
       .then((p) => {
         if (!alive) return
         setPicks(p)
@@ -227,9 +227,13 @@ export default function HomePage() {
           <SectionTitle
             title="Picks for tonight"
             subtitle={
-              picks?.based_on.length
-                ? `Because you watched ${picks.based_on.slice(0, 3).join(', ')}`
-                : 'From your watch history'
+              picks?.ready_count
+                ? picks.ready_count >= picks.recommendations.length
+                  ? 'Downloaded and ready to watch'
+                  : 'Downloaded and ready to watch, then a few more to fetch'
+                : picks?.based_on.length
+                  ? `Because you watched ${picks.based_on.slice(0, 3).join(', ')}`
+                  : 'From your watch history'
             }
             action={
               <Button variant="ghost" size="sm" onClick={() => navigate('/discover')}>

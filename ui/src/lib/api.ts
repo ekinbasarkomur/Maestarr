@@ -154,6 +154,8 @@ export interface MediaRef {
 export interface Recommendations {
   based_on: string[]
   recommendations: MediaRef[]
+  /** Picks for tonight: how many lead items are already downloaded. */
+  ready_count?: number
 }
 
 export interface CacheStatus {
@@ -316,6 +318,8 @@ export const api = {
     get<Recommendations>(
       `/api/recommendations?${qs({ kind, mood, tags: tags?.length ? tags.join(',') : undefined })}`,
     ),
+  tonight: (tags?: string[]) =>
+    get<Recommendations>(`/api/tonight?${qs({ tags: tags?.length ? tags.join(',') : undefined })}`),
   rows: (refresh = false) =>
     get<DiscoverRows>(`/api/discover/rows${refresh ? '?refresh=true' : ''}`),
   search: (params: SearchParams) =>

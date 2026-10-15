@@ -194,3 +194,44 @@ async def unwatched_in_library(svc: Services, limit: int = 14) -> list[dict[str,
                 r["rating"] = det.get("vote_average")
                 r["genres"] = [g["name"] for g in det.get("genres", [])]
     return out[:limit]
+
+
+READY_SCAN = 150  # how many of the newest unwatched downloads are scored
+
+
+async def ready_to_watch(svc: Services, tags: Optional[list[str]] = None, limit: int = 12) -> list[dict[str, Any]]:
+    """Downloaded titles not watched yet, best match for the user's taste first —
+    what "Picks for tonight" offers before anything that still has to be fetched."""
+    from maestarr.clients.tmdb import credits_people
+
+    profile = await discovery.taste_profile(svc)
+    watched = await discovery.watched_set(svc)
+    hidden = (await discovery.feedback_store(svc).state()).hidden
+    _, ids = await discovery.library_index(svc)
+    library = await discovery.library_history(svc, limit=400)
+    candidates = [
+        ev for ev in library
+        if ev.tmdb_id and (tmdb_kind(ev.kind), ev.tmdb_id) not in watched
+        and (tmdb_kind(ev.kind), ev.tmdb_id) not in hidden
+    ][:READY_SCAN]
+    cache = discovery._cache(svc)
+    details = await asyncio.gather(*(cache.details(tmdb_kind(ev.kind), ev.tmdb_id) for ev in candidates))  # type: ignore[arg-type]
+    wanted = {t.lower() for t in tags or []}
+    scored: list[tuple[float, dict[str, Any]]] = []
+    for ev, det in zip(candidates, details):
+        if not det:
+            continue
+        ref = await cache.tmdb.to_ref(tmdb_kind(ev.kind), det, anime=ev.kind == "anime")
+        if wanted and not wanted & {x.lower() for x in ref.keywords + ref.genres}:
+            continue
+        score, why = taste_score(ref, credits_people(det), profile)
+        ref.in_library = True
+        row = discovery._ref_out(ref)
+        row["match"] = round(score * 100)
+        row["why"] = ["downloaded, ready to watch", *why]
+        row["ready"] = True
+        if ev.kind == "movie" and ev.tmdb_id in ids["movie_by_tmdb"]:
+            row["movie_id"] = ids["movie_by_tmdb"][ev.tmdb_id]
+        scored.append((score, row))
+    scored.sort(key=lambda s: -s[0])
+    return [row for _, row in scored[:limit]]

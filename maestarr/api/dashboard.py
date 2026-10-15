@@ -179,6 +179,31 @@ async def recommendations(
     return {**out, "recommendations": items}
 
 
+@router.get("/tonight")
+async def tonight(tags: Optional[str] = None, limit: int = 12, _: Any = Depends(require_user)) -> Any:
+    """Picks for tonight: downloaded, unwatched titles first; only when there are
+    too few is the shelf topped up with suggestions that still need fetching."""
+    from maestarr.taste.rows import ready_to_watch
+
+    svc = get_services()
+    tag_list = sorted({t.strip() for t in (tags or "").split(",") if t.strip()})
+    try:
+        ready = await ready_to_watch(svc, tag_list, limit)
+    except ServiceError as exc:
+        return JSONResponse({"detail": str(exc)}, status_code=503)
+    out: dict[str, Any] = {"based_on": [], "recommendations": ready, "ready_count": len(ready)}
+    if len(ready) < limit:
+        fill = await recommendations(kind="movie", tags=",".join(tag_list) or None, limit=limit, _=_)
+        if isinstance(fill, dict):
+            seen = {(r.get("kind"), r.get("tmdb_id")) for r in ready}
+            extra = [r for r in fill["recommendations"] if (r.get("kind"), r.get("tmdb_id")) not in seen]
+            out["recommendations"] = ready + extra[: limit - len(ready)]
+            out["based_on"] = fill.get("based_on", [])
+        elif not ready:
+            return fill
+    return out
+
+
 @router.get("/discover/rows")
 async def discover_rows(refresh: bool = False, _: Any = Depends(require_user)) -> Any:
     from maestarr.ops.discovery import record_impressions

@@ -18,6 +18,9 @@ change behaviour.
 - **Home is the "For you" page**: *Picks for tonight* is a sliding shelf (still
   filterable by tags), followed by every other shelf, with a loading screen while
   they are first built. Discover keeps search and the Adult tab.
+- **Picks for tonight are ready to watch**: the shelf leads with films and series you
+  have downloaded but not watched, best match first; only when there are too few is
+  it topped up with suggestions that still have to be fetched.
 - **More taste signals**: Jellyfin favourites, Seerr requests, Trakt watchlist and
   AniList favourites and plan-to-watch now shape the picks, each weighted for how much
   it says.
