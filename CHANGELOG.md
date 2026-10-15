@@ -48,6 +48,8 @@ change behaviour.
 - A cancelled turn also lists the steps that were still running when it was stopped.
 
 ### Fixed
+- Downloads no longer drop out of *Picks for tonight* after they were shown a few
+  times: only *Not for me* removes something you already have.
 - "Database is locked" errors (failed logins, chats that would not delete) while
   suggestions were being recorded: the database now uses write-ahead logging and
   shown suggestions are saved in one short write.

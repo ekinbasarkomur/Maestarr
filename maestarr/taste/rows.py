@@ -206,13 +206,16 @@ async def ready_to_watch(svc: Services, tags: Optional[list[str]] = None, limit:
 
     profile = await discovery.taste_profile(svc)
     watched = await discovery.watched_set(svc)
-    hidden = (await discovery.feedback_store(svc).state()).hidden
+    # Only "Not for me" hides a download: the spacing that rests ignored suggestions
+    # must not empty the shelf of things the user already chose to keep.
+    state = await discovery.feedback_store(svc).state()
+    turned_down = {(d["kind"], int(d["tmdb_id"])) for d in state.disliked}
     _, ids = await discovery.library_index(svc)
     library = await discovery.library_history(svc, limit=400)
     candidates = [
         ev for ev in library
         if ev.tmdb_id and (tmdb_kind(ev.kind), ev.tmdb_id) not in watched
-        and (tmdb_kind(ev.kind), ev.tmdb_id) not in hidden
+        and (tmdb_kind(ev.kind), ev.tmdb_id) not in turned_down
     ][:READY_SCAN]
     cache = discovery._cache(svc)
     details = await asyncio.gather(*(cache.details(tmdb_kind(ev.kind), ev.tmdb_id) for ev in candidates))  # type: ignore[arg-type]
