@@ -2,7 +2,6 @@ import { ArrowLeft, ArrowRight, Check } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 
-import { AdultSwitch } from '@/components/AdultSwitch'
 import { AiForm } from '@/components/AiForm'
 import { LanguagePicker } from '@/components/LanguagePicker'
 import { ServiceCard, ServiceForm } from '@/components/ServiceForm'
@@ -281,7 +280,7 @@ function StepBody({
   if (step === 'services') {
     return (
       <div className="space-y-3">
-        {['sonarr', 'radarr', 'qbittorrent', 'prowlarr', 'whisparr'].map((id, i) => (
+        {['sonarr', 'radarr', 'qbittorrent', 'prowlarr'].map((id, i) => (
           <ServiceCard
             key={id}
             def={SERVICES[id]}
@@ -290,14 +289,13 @@ function StepBody({
             defaultOpen={i === 0}
           />
         ))}
-        <AdultSwitch sections={sections} onSaved={setSections} />
       </div>
     )
   }
   if (step === 'discovery') {
     return (
       <div className="space-y-3">
-        {['seerr', 'tmdb', 'omdb', 'trakt', 'anilist', 'stashdb'].map((id, i) => (
+        {['seerr', 'tmdb', 'omdb', 'trakt', 'anilist'].map((id, i) => (
           <ServiceCard
             key={id}
             def={SERVICES[id]}
@@ -306,7 +304,6 @@ function StepBody({
             defaultOpen={i === 0}
           />
         ))}
-        <AdultSwitch sections={sections} onSaved={setSections} />
       </div>
     )
   }
@@ -341,7 +338,6 @@ function DoneStep({
       { label: 'Radarr', ok: has('radarr', 'RADARR_URL') },
       { label: 'qBittorrent', ok: has('qbittorrent', 'QBITTORRENT_URL') },
       { label: 'Prowlarr', ok: has('prowlarr', 'PROWLARR_URL') },
-      { label: 'Whisparr', ok: has('whisparr', 'WHISPARR_URL') },
       { label: 'TMDB', ok: has('tmdb', 'TMDB_API_KEY') },
       { label: 'Telegram', ok: has('telegram', 'TELEGRAM_BOT_TOKEN') },
     ]

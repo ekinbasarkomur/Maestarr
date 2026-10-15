@@ -71,10 +71,10 @@ without your approval.
 - **Set up in the browser** — a guided first run, with a connection test for
   every service and every setting editable later. No config files. Telegram
   pairs itself: test the bot token, send `/start`, done.
-- **Adult content behind one switch** — off by default. While it is off,
-  Maestarr never contacts Whisparr or StashDB and shows no adult results. When
-  it is on, Discover gets an Adult tab with new scenes from the studios and
-  performers in your Whisparr library.
+- **Optional 18+ section** — off by default and not part of onboarding. It can be
+  turned on (with an age confirmation) at the bottom of Settings → Discovery; until
+  then Maestarr never contacts Whisparr or StashDB. Set `MAESTARR_ALLOW_ADULT=false`
+  in the environment to lock it off entirely.
 - **Any model** — Anthropic, OpenAI, Google, OpenRouter, a local Ollama, or any
   OpenAI-compatible server.
 - **Proxy support** — the same proxy settings as Sonarr/Radarr/Prowlarr (HTTP
@@ -112,7 +112,7 @@ without your approval.
 | [TMDB](https://www.themoviedb.org) | the same, with your own key (used instead of Seerr when set) | optional |
 | [OMDb](https://www.omdbapi.com) | IMDb ratings | optional |
 | [Trakt](https://trakt.tv), [AniList](https://anilist.co), Letterboxd export | more history | optional |
-| [Whisparr](https://whisparr.com) v3, [StashDB](https://stashdb.org) | adult content — only while the 18+ switch is on | optional |
+| [Whisparr](https://whisparr.com) v3, [StashDB](https://stashdb.org) | the optional 18+ section (Settings → Discovery) | optional |
 | Telegram | chat from your phone | optional |
 
 ## Installation

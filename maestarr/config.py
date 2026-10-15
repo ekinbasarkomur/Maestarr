@@ -18,7 +18,7 @@ import functools
 from pathlib import Path
 from typing import Annotated, Any, Literal, Optional
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 LlmProvider = Literal["anthropic", "openai", "google", "openrouter", "ollama", "openai-compat"]
@@ -98,6 +98,9 @@ class Settings(BaseSettings):
     # Master switch for 18+ content: while off, Whisparr and StashDB are never contacted,
     # so no adult tools, library items or search results reach the assistant or the UI.
     MAESTARR_ADULT_CONTENT: bool = False
+    # Environment only: false hides the 18+ switch and keeps adult content off for good,
+    # whatever was saved in the UI (for family or shared installs).
+    MAESTARR_ALLOW_ADULT: bool = True
 
     # Whisparr v3 (adult). Its tools only appear when this is configured and the switch is on.
     WHISPARR_URL: Optional[str] = None
@@ -144,6 +147,13 @@ class Settings(BaseSettings):
     MAESTARR_ENRICH_TOP_N: int = 6
     MAESTARR_PROBE_TIMEOUT: float = 60.0
     MAESTARR_MIN_FREE_GB: float = 50.0
+
+    @model_validator(mode="after")
+    def _adult_lock(self) -> "Settings":
+        if not self.MAESTARR_ALLOW_ADULT:
+            self.MAESTARR_ADULT_CONTENT = False
+            self.MAESTARR_HOME_ADULT_DOWNLOADS = False
+        return self
 
     @field_validator("TELEGRAM_ALLOWED_CHAT_IDS", mode="before")
     @classmethod

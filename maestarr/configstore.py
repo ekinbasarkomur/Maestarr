@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 # Settings that may never be changed from the UI (they decide where the UI
 # and the database themselves live).
 BOOTSTRAP_ONLY = {
+    "MAESTARR_ALLOW_ADULT",  # an admin's lock: set in the environment, never from the UI
     "MAESTARR_HOST",
     "MAESTARR_PORT",
     "MAESTARR_DATA_DIR",

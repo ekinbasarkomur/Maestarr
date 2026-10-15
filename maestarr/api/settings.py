@@ -123,13 +123,16 @@ async def apply_update(update: dict[str, Any]) -> Settings:
 @router.get("")
 async def read_settings(_: Any = Depends(require_setup_open)) -> dict[str, Any]:
     s = get_settings()
-    return {"sections": public_view(s), "setup_complete": s.MAESTARR_SETUP_COMPLETE, "api_token_set": bool(secret(s.MAESTARR_API_TOKEN))}
+    return {"sections": public_view(s), "setup_complete": s.MAESTARR_SETUP_COMPLETE,
+            "api_token_set": bool(secret(s.MAESTARR_API_TOKEN)), "adult_allowed": s.MAESTARR_ALLOW_ADULT}
 
 
 @router.put("")
 async def save_settings(body: SettingsUpdate, _: Any = Depends(require_setup_open)) -> dict[str, Any]:
+    if body.fields.get("MAESTARR_ADULT_CONTENT") and not get_settings().MAESTARR_ALLOW_ADULT:
+        raise HTTPException(status_code=403, detail="adult content is locked off on this server (MAESTARR_ALLOW_ADULT=false)")
     s = await apply_update(body.fields)
-    return {"sections": public_view(s), "setup_complete": s.MAESTARR_SETUP_COMPLETE}
+    return {"sections": public_view(s), "setup_complete": s.MAESTARR_SETUP_COMPLETE, "adult_allowed": s.MAESTARR_ALLOW_ADULT}
 
 
 @router.post("/complete-setup")

@@ -58,6 +58,8 @@ export interface SettingsResponse {
   sections: Sections
   setup_complete: boolean
   api_token_set?: boolean
+  /** False when the server locks adult content off (MAESTARR_ALLOW_ADULT=false). */
+  adult_allowed?: boolean
 }
 
 export interface TestResult {

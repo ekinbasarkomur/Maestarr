@@ -17,7 +17,7 @@ change behaviour.
   1 day (default) / 1 week, or only by hand; *Not for me* still applies at once.
 - **Home is the "For you" page**: *Picks for tonight* is a sliding shelf (still
   filterable by tags), followed by every other shelf, with a loading screen while
-  they are first built. Discover keeps search and the Adult tab.
+  they are first built. Discover keeps search.
 - **Picks for tonight are ready to watch**: the shelf leads with films and series you
   have downloaded but not watched, best match first; only when there are too few is
   it topped up with suggestions that still have to be fetched.
@@ -33,14 +33,17 @@ change behaviour.
   release dates, length and sort, with autocomplete from StashDB. Scene taste is kept
   apart from film taste. The agent gets the same search as `adult_discover`.
 - Settings → Discovery: *Show adult downloads on the home page* (off by default).
+- `MAESTARR_ALLOW_ADULT=false` (environment only) locks the 18+ section off: the switch
+  disappears, saved settings are overruled, and the API refuses to turn it on.
 
 ### Changed
+- **The 18+ section left onboarding**: setup no longer mentions Whisparr, StashDB or the
+  switch. It lives at the bottom of Settings → Discovery and needs an age confirmation;
+  Whisparr and StashDB settings appear only once it is on.
 - With 18+ off, adult downloads (Whisparr's qBittorrent category, plus "adult",
   "whisparr", "xxx") are hidden from the assistant — not listed, inspected or
   removed — and XXX results are dropped from indexer searches.
 - The tag suggestions dropdown has a solid background.
-
-### Changed
 - A cancelled turn also lists the steps that were still running when it was stopped.
 
 ### Fixed

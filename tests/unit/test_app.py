@@ -118,3 +118,27 @@ async def test_complete_setup(client):
 async def test_unknown_api_path_is_json_404(client):
     r = await client.get("/api/does-not-exist")
     assert r.status_code == 404 and "no such endpoint" in r.json()["detail"]
+
+
+async def test_adult_switch_works_unless_the_server_locks_it(client):
+    await _setup(client)
+    assert (await client.get("/api/settings")).json()["adult_allowed"] is True
+    r = await client.put("/api/settings", json={"fields": {"MAESTARR_ADULT_CONTENT": True}})
+    assert r.status_code == 200 and r.json()["sections"]["adult"]["MAESTARR_ADULT_CONTENT"] is True
+    # The lock is environment-only: the UI cannot lift it.
+    assert (await client.put("/api/settings", json={"fields": {"MAESTARR_ALLOW_ADULT": True}})).status_code == 422
+
+
+async def test_locked_server_keeps_adult_content_off(client, monkeypatch):
+    from maestarr.config import get_settings, reload_settings
+
+    await _setup(client)
+    await client.put("/api/settings", json={"fields": {"MAESTARR_ADULT_CONTENT": True}})
+    monkeypatch.setenv("MAESTARR_ALLOW_ADULT", "false")
+    reload_settings()
+    assert get_settings().MAESTARR_ADULT_CONTENT is False  # the saved "on" is overruled
+    body = (await client.get("/api/settings")).json()
+    assert body["adult_allowed"] is False and body["sections"]["adult"]["MAESTARR_ADULT_CONTENT"] is False
+    r = await client.put("/api/settings", json={"fields": {"MAESTARR_ADULT_CONTENT": True}})
+    assert r.status_code == 403
+    assert (await client.get("/api/adult/rows")).status_code == 503
