@@ -49,8 +49,20 @@ def _poster(images: list[dict[str, Any]]) -> Optional[str]:
 
 @router.get("/overview")
 async def overview(_: Any = Depends(require_user)) -> dict[str, Any]:
-    """Library counts, disks, active downloads and recent watching for the home screen."""
     svc = get_services()
+    return _without_adult_downloads(svc, await _overview(svc))
+
+
+def _without_adult_downloads(svc: Any, data: dict[str, Any]) -> dict[str, Any]:
+    """Whisparr downloads show on the home page only when both switches allow it."""
+    s = svc.settings
+    if s.MAESTARR_ADULT_CONTENT and s.MAESTARR_HOME_ADULT_DOWNLOADS:
+        return data
+    return {**data, "queue": [q for q in data.get("queue", []) if q.get("app") != "whisparr"]}
+
+
+async def _overview(svc: Any) -> dict[str, Any]:
+    """Library counts, disks, active downloads and recent watching for the home screen."""
     cached = svc.memo.get("overview")
     if cached:
         # Serve the last result at once; refresh in the background when it is old.
@@ -145,16 +157,26 @@ async def recommendations(
     limit: int = 12,
     _: Any = Depends(require_user),
 ) -> Any:
-    from maestarr.ops.discovery import recommendations as recs, record_impressions
+    from maestarr.cache import cached
+    from maestarr.ops.discovery import cache_store, feedback_store, picks_age, record_impressions
+    from maestarr.ops.discovery import recommendations as recs
 
     svc = get_services()
+    tag_list = sorted({t.strip() for t in (tags or "").split(",") if t.strip()})
+    key = f"picks:recs:{kind}:{(mood or '').lower()}:{','.join(tag_list).lower()}:{limit}"
     try:
-        out = await recs(svc, kind=kind, mood=mood, limit=limit,  # type: ignore[arg-type]
-                         tags=[t.strip() for t in (tags or "").split(",") if t.strip()])
+        out = await cached(
+            cache_store(svc), key, max_age=picks_age(svc),
+            build=lambda: recs(svc, kind=kind, mood=mood, limit=limit + 6, tags=tag_list),  # type: ignore[arg-type]
+        )
     except ServiceError as exc:
         return JSONResponse({"detail": str(exc)}, status_code=503)
-    await record_impressions(svc, out["recommendations"])
-    return out
+    hidden = (await feedback_store(svc).state()).hidden
+    from maestarr.taste.rows import _hidden
+
+    items = [r for r in out["recommendations"] if not _hidden(r, hidden)][:limit]
+    await record_impressions(svc, items)
+    return {**out, "recommendations": items}
 
 
 @router.get("/discover/rows")
@@ -240,6 +262,21 @@ async def discover_genres(kind: str = "movie", _: Any = Depends(require_user)) -
     return sorted(names.values())
 
 
+@router.get("/cache")
+async def cache_status(_: Any = Depends(require_user)) -> Any:
+    from maestarr.refresh import status
+
+    return await status(get_services())
+
+
+@router.post("/cache/refresh")
+async def cache_refresh(_: Any = Depends(require_user)) -> Any:
+    """Rebuild history, libraries, taste profile and shelves now (in the background)."""
+    from maestarr.refresh import start_refresh
+
+    return {"started": start_refresh(get_services())}
+
+
 class Feedback(BaseModel):
     kind: str
     tmdb_id: int
@@ -255,9 +292,7 @@ async def feedback(body: Feedback, _: Any = Depends(require_user)) -> Any:
     if body.action not in ("open", "search", "add", "dismiss"):
         return JSONResponse({"detail": "unknown action"}, status_code=400)
     svc = get_services()
-    out = await react(svc, body.kind, body.tmdb_id, body.action, body.title)
-    svc.memo.pop("rows", None)
-    return out
+    return await react(svc, body.kind, body.tmdb_id, body.action, body.title)
 
 
 @router.get("/details")

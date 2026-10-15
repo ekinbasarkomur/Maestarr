@@ -98,7 +98,8 @@ def _dynamic_instructions(ctx: RunContext[Services]) -> str:
     ]
     if not svc.settings.MAESTARR_ADULT_CONTENT:
         lines.append(
-            "Adult content is switched off: never search for, suggest or discuss adult titles; if asked, "
+            "Adult content is switched off: never search for, suggest or discuss adult titles, and treat "
+            "adult downloads as if they did not exist (do not list, inspect or remove them); if asked, "
             "say it can be enabled under Settings → Discovery."
         )
     if CHANNEL.get() == "telegram":

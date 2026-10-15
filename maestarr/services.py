@@ -33,6 +33,14 @@ logger = logging.getLogger(__name__)
 STATUS_TIMEOUT = 10.0
 
 
+def _seerr(s: Settings) -> Optional[Any]:
+    if not (s.SEERR_URL and secret(s.SEERR_API_KEY)):
+        return None
+    from maestarr.clients.seerr import SeerrMetadataClient
+
+    return SeerrMetadataClient(s.SEERR_URL, secret(s.SEERR_API_KEY) or "")
+
+
 def metadata_client(s: Settings) -> Optional[TmdbClient]:
     """TMDB itself when a key is set, otherwise Seerr standing in for it."""
     from maestarr.language import metadata_code
@@ -66,6 +74,7 @@ class Services:
     anilist: Optional[AniListClient] = None
     trakt: Optional[TraktClient] = None
     stashdb: Optional[StashDbClient] = None
+    seerr: Optional[Any] = None  # SeerrMetadataClient — requests are a taste signal
     resolver: ReleaseResolver = field(init=False)
     # Releases seen in recent searches (guid → candidate) and their latest
     # assessment; a grab must name a release the user has actually seen.
@@ -117,6 +126,7 @@ class Services:
             omdb=OmdbClient(secret(s.OMDB_API_KEY) or "") if secret(s.OMDB_API_KEY) else None,
             anilist=AniListClient(s.data_dir),
             trakt=TraktClient(secret(s.TRAKT_CLIENT_ID) or "") if secret(s.TRAKT_CLIENT_ID) else None,
+            seerr=_seerr(s),
             stashdb=StashDbClient(s.STASHDB_URL, secret(s.STASHDB_API_KEY) or "")
             if s.MAESTARR_ADULT_CONTENT and s.STASHDB_ENABLED and secret(s.STASHDB_API_KEY)
             else None,
@@ -199,7 +209,7 @@ class Services:
             c
             for c in (
                 self.sonarr, self.radarr, self.whisparr, self.prowlarr, self.qbittorrent, self.jellyfin,
-                self.tmdb, self.omdb, self.anilist, self.trakt, self.stashdb,
+                self.tmdb, self.omdb, self.anilist, self.trakt, self.stashdb, self.seerr,
             )
             if c is not None
         ]

@@ -342,7 +342,9 @@ async def torrents_holding(svc: Services, relative_paths: list[str]) -> list[dic
     qbit = svc.qbittorrent
     names = {p.rsplit("/", 1)[-1].lower() for p in relative_paths if p}
     stems = {n.rsplit(".", 1)[0] for n in names}
-    torrents = await qbit.torrents()
+    from maestarr.ops.downloads import visible_torrents
+
+    torrents = await visible_torrents(svc, await qbit.torrents())
     sem = asyncio.Semaphore(6)
 
     async def holds(t: dict[str, Any]) -> bool:

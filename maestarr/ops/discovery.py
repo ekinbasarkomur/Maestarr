@@ -10,6 +10,7 @@ from collections import Counter
 from datetime import datetime
 from typing import Any, Literal, Optional
 
+from maestarr.cache import CacheStore, cached, store_for
 from maestarr.clients.base import ServiceError
 from maestarr.clients.history_sources import letterboxd_export
 from maestarr.clients.tmdb import tmdb_kind
@@ -83,16 +84,39 @@ async def library_history(svc: Services, limit: int = 300) -> list[WatchEvent]:
     return events[:limit]
 
 
+def cache_store(svc: Services) -> CacheStore:
+    return store_for(svc.settings.database_path)
+
+
+def data_age(svc: Services) -> float:
+    """How old watch history, libraries and the taste profile may get."""
+    return max(1, svc.settings.MAESTARR_DATA_REFRESH_HOURS) * 3600.0
+
+
+def picks_age(svc: Services) -> Optional[float]:
+    """How long suggestion shelves stay as they are (None: only refreshed by hand)."""
+    s = svc.settings
+    return max(1, s.MAESTARR_PICKS_REFRESH_HOURS) * 3600.0 if s.MAESTARR_PICKS_REFRESH else None
+
+
+def _events_out(events: list[WatchEvent]) -> list[dict[str, Any]]:
+    return [e.model_dump(mode="json") for e in events]
+
+
+def _events_in(raw: list[dict[str, Any]]) -> list[WatchEvent]:
+    return [WatchEvent.model_validate(e) for e in raw]
+
+
 async def watch_history(svc: Services, limit: int = 400) -> list[WatchEvent]:
-    """Merged history from every source, cached for a while (Jellyfin can take a minute)."""
-    cached = svc.memo.get("watch_history")
-    if cached and time.time() - cached[0] < HISTORY_TTL:
-        return list(cached[1])
-    history = await _collect_history(svc, limit)
-    if not history:
-        history = await library_history(svc)
-    svc.memo["watch_history"] = (time.time(), history)
-    return list(history)
+    """Merged history from every source — cached, because Jellyfin can take a minute."""
+
+    async def build() -> list[WatchEvent]:
+        history = await _collect_history(svc, limit)
+        return history or await library_history(svc)
+
+    events = await cached(cache_store(svc), "data:watch_history", max_age=data_age(svc), build=build,
+                          encode=_events_out, decode=_events_in)
+    return list(events)
 
 
 async def _collect_history(svc: Services, limit: int) -> list[WatchEvent]:
@@ -136,27 +160,55 @@ def feedback_store(svc: Services) -> FeedbackStore:
 async def taste_events(svc: Services) -> list[WatchEvent]:
     """Everything that says something about taste: what was watched (and rated),
     plus what was added to Sonarr/Radarr — the latter at a lower weight."""
-    cached = svc.memo.get("taste_events")
-    if cached and time.time() - cached[0] < HISTORY_TTL:
-        return list(cached[1])
-    watched = await watch_history(svc)
-    real = [e for e in watched if e.source != "library"]
-    library = await library_history(svc) if (svc.sonarr or svc.radarr) else []
-    events = merge_history(real, library)
-    svc.memo["taste_events"] = (time.time(), events)
+    async def build() -> list[WatchEvent]:
+        watched = await watch_history(svc)
+        real = [e for e in watched if e.source != "library"]
+        interest = await interest_events(svc)
+        library = await library_history(svc) if (svc.sonarr or svc.radarr) else []
+        return merge_history(real, interest, library)
+
+    events = await cached(cache_store(svc), "data:taste_events", max_age=data_age(svc), build=build,
+                          encode=_events_out, decode=_events_in)
+    return list(events)
+
+
+async def interest_events(svc: Services) -> list[WatchEvent]:
+    """Favourites (Jellyfin, AniList), requests (Seerr) and watchlists (Trakt, AniList)."""
+    tasks = []
+    if svc.jellyfin:
+        tasks.append(svc.jellyfin.favorites())
+    if svc.seerr:
+        tasks.append(svc.seerr.requests())
+    if svc.trakt and svc.settings.TRAKT_USERNAME:
+        tasks.append(svc.trakt.watchlist_events(svc.settings.TRAKT_USERNAME))
+    if svc.anilist and svc.settings.ANILIST_USERNAME:
+        tasks.append(svc.anilist.user_interest(svc.settings.ANILIST_USERNAME))
+    events: list[WatchEvent] = []
+    for result in await asyncio.gather(*tasks, return_exceptions=True):
+        if isinstance(result, BaseException):
+            logger.warning("interest source failed: %s", result)
+        else:
+            events += result
     return events
 
 
 async def taste_profile(svc: Services, refresh: bool = False) -> TasteProfile:
-    cached = svc.memo.get("taste_profile")
-    if cached and not refresh and time.time() - cached[0] < PROFILE_TTL:
-        return cached[1]
-    history = await taste_events(svc)
-    if not history:
-        raise ServiceError("maestarr", "no watch history and an empty library — watch something in Jellyfin or connect Trakt/AniList")
-    profile = await build_profile(history, _cache(svc))
+    async def build() -> TasteProfile:
+        history = await taste_events(svc)
+        if not history:
+            raise ServiceError("maestarr", "no watch history and an empty library — watch something in Jellyfin or connect Trakt/AniList")
+        return await build_profile(history, _cache(svc))
+
+    store = cache_store(svc)
+    if refresh:
+        await store.drop("data:taste_profile")
+    base: TasteProfile = await cached(
+        store, "data:taste_profile", max_age=data_age(svc), build=build,
+        encode=lambda p: p.model_dump(mode="json"), decode=TasteProfile.model_validate,
+    )
+    # Reactions apply at once, on top of the cached profile.
+    profile = base.model_copy(deep=True)
     apply_feedback(profile, await feedback_store(svc).state())
-    svc.memo["taste_profile"] = (time.time(), profile)
     return profile
 
 
@@ -307,15 +359,16 @@ async def recommendations(
 
 async def watched_set(svc: Services) -> set[tuple[str, int]]:
     """(tmdb kind, tmdb id) of everything actually watched (not merely owned)."""
-    cached = svc.memo.get("watched_set")
-    if cached and time.time() - cached[0] < HISTORY_TTL:
-        return set(cached[1])
-    history = [e for e in await watch_history(svc) if e.source != "library"]
-    cache = _cache(svc)
-    resolved = await asyncio.gather(*(cache.resolve(e) for e in history[:300]))
-    out = {pair for pair in resolved if pair}
-    svc.memo["watched_set"] = (time.time(), out)
-    return out
+    async def build() -> set[tuple[str, int]]:
+        history = [e for e in await watch_history(svc) if e.source != "library"]
+        cache = _cache(svc)
+        resolved = await asyncio.gather(*(cache.resolve(e) for e in history[:300]))
+        return {pair for pair in resolved if pair}
+
+    return set(await cached(
+        cache_store(svc), "data:watched_set", max_age=data_age(svc), build=build,
+        encode=lambda v: sorted([k, i] for k, i in v), decode=lambda raw: {(k, int(i)) for k, i in raw},
+    ))
 
 
 async def record_impressions(svc: Services, items: list[dict[str, Any]]) -> None:
@@ -340,7 +393,6 @@ async def react(svc: Services, kind: str, tmdb_id: int, action: str, title: Opti
             ref = await svc.tmdb.to_ref(k, det)
             genres, keywords, title = ref.genres, ref.keywords[:20], title or ref.title
     await feedback_store(svc).react(k, tmdb_id, action, title=title, genres=genres, keywords=keywords)  # type: ignore[arg-type]
-    svc.memo.pop("taste_profile", None)  # the next picks use the new signal
     return {"ok": True, "kind": k, "tmdb_id": tmdb_id, "action": action}
 
 

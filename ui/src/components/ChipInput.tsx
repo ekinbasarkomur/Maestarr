@@ -99,7 +99,7 @@ export function ChipInput({
         </div>
       </div>
       {open && text.trim().length >= 2 && hits.length > 0 && (
-        <ul className="glass absolute z-30 mt-1 max-h-64 w-full max-w-sm overflow-y-auto rounded-xl p-1 shadow-xl ring-1 ring-white/10">
+        <ul className="absolute z-30 mt-1 max-h-64 w-full max-w-sm overflow-y-auto rounded-xl bg-[#14161d] p-1 shadow-2xl shadow-black/60 ring-1 ring-white/15">
           {hits.map((h) => (
             <li key={h.id}>
               <button

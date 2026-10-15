@@ -44,6 +44,7 @@ class ProwlarrClient(HttpService):
         kind: str = "any",
         indexer_ids: Optional[Sequence[int]] = None,
         limit: int = 100,
+        exclude_adult: bool = False,
     ) -> list[ReleaseCandidate]:
         params: list[tuple[str, str]] = [("query", query), ("type", "search"), ("limit", str(limit))]
         for cat in CATEGORIES.get(kind, []):
@@ -51,7 +52,19 @@ class ProwlarrClient(HttpService):
         for idx in indexer_ids or []:
             params.append(("indexerIds", str(idx)))
         response = await self.request("GET", "/api/v1/search", params=params)
-        return [release_from_prowlarr(item) for item in response.json() or []]
+        items = response.json() or []
+        if exclude_adult:
+            items = [i for i in items if not is_adult(i)]
+        return [release_from_prowlarr(item) for item in items]
+
+
+def is_adult(item: dict[str, Any]) -> bool:
+    """Newznab/Torznab category 6000-6999 is XXX.
+
+    >>> is_adult({"categories": [{"id": 6010}]}), is_adult({"categories": [{"id": 2040}, {"id": 100001}]})
+    (True, False)
+    """
+    return any(6000 <= int(c.get("id") or 0) < 7000 for c in item.get("categories") or [])
 
     async def grab(self, guid: str, indexer_id: int) -> dict[str, Any]:
         """Send a search result to Prowlarr's own download client."""

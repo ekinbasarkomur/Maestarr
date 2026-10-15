@@ -7,6 +7,28 @@ change behaviour.
 
 ## [Unreleased]
 
+### Added
+- **Caching**: watch history, libraries, favourites and the taste profile are kept in
+  the database, so pages open at once even after a restart. They refresh when older
+  than an interval (12 h / 1 day / 1 week) — lazily on your next visit, or on a
+  schedule with *Refresh in the background* (off by default). *Refresh now* in
+  Settings → General → Caching rebuilds everything.
+- **Shelves stay put**: picks and shelves are cached and refreshed every 6 h / 12 h /
+  1 day (default) / 1 week, or only by hand; *Not for me* still applies at once.
+- **Home is the "For you" page**: *Picks for tonight* is a sliding shelf (still
+  filterable by tags), followed by every other shelf, with a loading screen while
+  they are first built. Discover keeps search and the Adult tab.
+- **More taste signals**: Jellyfin favourites, Seerr requests, Trakt watchlist and
+  AniList favourites and plan-to-watch now shape the picks, each weighted for how much
+  it says.
+- Settings → Discovery: *Show adult downloads on the home page* (off by default).
+
+### Changed
+- With 18+ off, adult downloads (Whisparr's qBittorrent category, plus "adult",
+  "whisparr", "xxx") are hidden from the assistant — not listed, inspected or
+  removed — and XXX results are dropped from indexer searches.
+- The tag suggestions dropdown has a solid background.
+
 ### Changed
 - A cancelled turn also lists the steps that were still running when it was stopped.
 

@@ -18,6 +18,7 @@ import httpx
 
 from maestarr.clients.base import HttpService
 from maestarr.clients.tmdb import TmdbClient, TmdbKind
+from maestarr.domain import WatchEvent
 
 _CAMEL = re.compile(r"(?<!^)(?=[A-Z])")
 
@@ -151,6 +152,24 @@ class SeerrMetadataClient(TmdbClient):
     async def person_credits(self, person_id: int) -> dict[str, Any]:
         data = await self.get_json(f"/person/{person_id}/combined_credits", language=self.language)
         return snake(data or {})
+
+    async def requests(self, take: int = 200) -> list[WatchEvent]:
+        """Titles requested through Seerr — the user asked for them, a clear interest."""
+        from datetime import datetime
+
+        data = await self.get_json("/request", take=take, skip=0, sort="added")
+        events = []
+        for r in (data or {}).get("results", []):
+            media = r.get("media") or {}
+            if not media.get("tmdbId"):
+                continue
+            when = r.get("createdAt")
+            events.append(WatchEvent(
+                kind="movie" if r.get("type") == "movie" else "series",
+                title=f"tmdb {media['tmdbId']}", tmdb_id=media.get("tmdbId"), tvdb_id=media.get("tvdbId"),
+                watched_at=datetime.fromisoformat(when.replace("Z", "+00:00")) if when else None, source="request",
+            ))
+        return events
 
     async def find(self, external_id: str, source: Literal["imdb_id", "tvdb_id"]) -> dict[str, Any]:
         """Seerr has no /find; search by the id where it can, else report nothing."""

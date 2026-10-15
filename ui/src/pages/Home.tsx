@@ -1,10 +1,10 @@
-import { ArrowRight, HardDrive, Loader2, Sparkles } from 'lucide-react'
+import { ArrowRight, HardDrive, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import { type DetailsTarget } from '@/components/DetailsModal'
 import { MediaTile } from '@/components/MediaCard'
-import { Shelf } from '@/components/Shelf'
+import { Shelf, ShelfSkeleton, ShelvesLoading } from '@/components/Shelf'
 import { Badge, Button, Panel } from '@/components/ui/primitives'
 import {
   api,
@@ -261,9 +261,8 @@ export default function HomePage() {
             </div>
           )}
           {!picks && !picksError && (
-            <div className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" />
-              Reading your history…
+            <div className="mt-4">
+              <ShelfSkeleton bare />
             </div>
           )}
           {picksError && (
@@ -280,32 +279,26 @@ export default function HomePage() {
             </p>
           )}
           {picks && (
-            <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6">
-              {picks.recommendations
-                .filter(visible)
-                .slice(0, 12)
-                .map((r) => (
-                  <MediaTile
-                    onDismiss={() => dismiss(r)}
-                    key={`${r.kind}-${r.tmdb_id}`}
-                    title={r.title}
-                    year={r.year}
-                    poster={r.poster_url}
-                    kind={r.kind}
-                    rating={r.imdb_rating ?? r.rating}
-                    inLibrary={r.in_library}
-                    onClick={() => details.open(targetFrom(r))}
-                  />
-                ))}
+            <div className="mt-4">
+              <Shelf
+                bare
+                row={{
+                  id: 'tonight',
+                  title: 'Picks for tonight',
+                  items: picks.recommendations.filter(visible),
+                }}
+                onOpen={(r) => details.open(targetFrom(r))}
+                onDismiss={dismiss}
+              />
             </div>
           )}
         </section>
 
+        {!shelves && !picksError && <ShelvesLoading rows={2} />}
         {shelves && shelves.rows.length > 0 && (
           <div className="space-y-10">
             {shelves.rows
               .filter((row) => row.id !== 'picks-movie')
-              .slice(0, 4)
               .map((row) => (
                 <Shelf
                   key={row.id}

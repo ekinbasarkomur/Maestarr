@@ -121,6 +121,18 @@ class JellyfinClient(HttpService):
         )
 
 
+    async def favorites(self) -> list[WatchEvent]:
+        """Movies and series marked as favourite — a strong "more like this" signal."""
+        items = await self.items(includeItemTypes="Movie,Series", filters="IsFavorite", limit=300)
+        out = []
+        for item in items:
+            ev = _event("movie" if item.get("Type") == "Movie" else "series", item, None)
+            ev.source = "favorite"
+            ev.rating = max(ev.rating or 0.0, 9.5)
+            out.append(ev)
+        return out
+
+
 def _event(kind: MediaKind, item: dict[str, Any], when: Optional[datetime], title: Optional[str] = None) -> WatchEvent:
     ids = {k.lower(): v for k, v in (item.get("ProviderIds") or {}).items()}
     user_rating = (item.get("UserData") or {}).get("Rating")

@@ -73,6 +73,17 @@ class Settings(BaseSettings):
     # Also used for metadata (titles, overviews) and the release judge's rationale.
     MAESTARR_LANGUAGE: str = "auto"
 
+    # Caching (Settings → General → Caching). Watch history, libraries and the taste
+    # profile are cached and refreshed when older than MAESTARR_DATA_REFRESH_HOURS —
+    # lazily on the next visit, or on a schedule when background refresh is on.
+    MAESTARR_BACKGROUND_REFRESH: bool = False
+    MAESTARR_DATA_REFRESH_HOURS: int = 24
+    # The suggestion shelves stay the same for this long, like a streaming app's rows.
+    MAESTARR_PICKS_REFRESH: bool = True
+    MAESTARR_PICKS_REFRESH_HOURS: int = 24
+    # Show Whisparr downloads in the home page's Downloading panel (18+ must be on too).
+    MAESTARR_HOME_ADULT_DOWNLOADS: bool = False
+
     # Outbound proxy, like Sonarr/Radarr/Prowlarr's Settings → General → Proxy.
     MAESTARR_PROXY_ENABLED: bool = False
     MAESTARR_PROXY_TYPE: str = "http"  # http (also for https targets) or socks5

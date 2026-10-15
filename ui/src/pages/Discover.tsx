@@ -12,21 +12,13 @@ import { useNavigate } from 'react-router'
 import { ChipInput } from '@/components/ChipInput'
 import { PickCardView } from '@/components/chat/PickCarousel'
 import { MediaTile } from '@/components/MediaCard'
-import { Shelf, ShelfSkeleton } from '@/components/Shelf'
 import { Button, Input, Select } from '@/components/ui/primitives'
-import {
-  type AdultPicks,
-  api,
-  type DiscoverRows,
-  type MediaRef,
-  type SearchParams,
-} from '@/lib/api'
+import { type AdultPicks, api, type MediaRef, type SearchParams } from '@/lib/api'
 import { type PickCard, searchPrompt } from '@/lib/picks'
 import { sendFeedback, targetFrom, useDetails } from '@/lib/useDetails'
 import { cn } from '@/lib/utils'
 
 const TABS = [
-  { id: 'foryou', label: 'For you' },
   { id: 'movie', label: 'Movies' },
   { id: 'series', label: 'Series' },
   { id: 'anime', label: 'Anime' },
@@ -53,7 +45,7 @@ export default function DiscoverPage() {
   const navigate = useNavigate()
   const ask = (prompt: string) => navigate('/chat', { state: { prompt } })
   const details = useDetails(ask)
-  const [tab, setTab] = useState('foryou')
+  const [tab, setTab] = useState('movie')
   const [adultOn, setAdultOn] = useState(false)
   const [taste, setTaste] = useState<{ tags: string[]; genres: string[]; people: string[] } | null>(
     null,
@@ -81,9 +73,7 @@ export default function DiscoverPage() {
           <p className="text-sm text-muted-foreground">
             {tab === 'adult'
               ? 'New scenes from the studios and performers in your Whisparr library.'
-              : tab === 'foryou'
-                ? 'Shelves built from what you watch, keep and open — titles you skip come back less often.'
-                : 'Search by anything: text, tags, people, genres, years, rating, language.'}
+              : 'Search by anything: text, tags, people, genres, years, rating, language. Your picks live on the home page.'}
           </p>
         </header>
         <div className="glass inline-flex flex-wrap rounded-xl p-1">
@@ -104,7 +94,6 @@ export default function DiscoverPage() {
           ))}
         </div>
 
-        {tab === 'foryou' && <ForYou onOpen={(r) => details.open(targetFrom(r))} />}
         {(tab === 'movie' || tab === 'series' || tab === 'anime') && (
           <SearchTab
             key={tab}
@@ -133,64 +122,6 @@ export default function DiscoverPage() {
           />
         )}
       </div>
-    </div>
-  )
-}
-
-/** Shelves built from the user's taste. */
-function ForYou({ onOpen }: { onOpen: (r: MediaRef) => void }) {
-  const [data, setData] = useState<DiscoverRows | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [hidden, setHidden] = useState<Set<string>>(new Set())
-
-  useEffect(() => {
-    let alive = true
-    api
-      .rows()
-      .then((d) => alive && setData(d))
-      .catch((e) => alive && setError((e as Error).message))
-    return () => {
-      alive = false
-    }
-  }, [])
-
-  const dismiss = (r: MediaRef) => {
-    sendFeedback(r.kind, r.tmdb_id, 'dismiss', r.title)
-    setHidden((h) => new Set(h).add(`${r.kind}-${r.tmdb_id}`))
-  }
-
-  if (error)
-    return (
-      <div className="glass rounded-2xl p-6 text-sm text-muted-foreground">
-        <p className="font-medium text-foreground">No shelves yet.</p>
-        <p className="mt-1">{error}</p>
-      </div>
-    )
-  if (!data)
-    return (
-      <div className="space-y-10">
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" /> Reading your history, library and tastes…
-        </p>
-        <ShelfSkeleton />
-        <ShelfSkeleton />
-      </div>
-    )
-  return (
-    <div className="space-y-10">
-      {data.rows.map((row) => (
-        <Shelf
-          key={row.id}
-          row={{ ...row, items: row.items.filter((i) => !hidden.has(`${i.kind}-${i.tmdb_id}`)) }}
-          onOpen={onOpen}
-          onDismiss={row.id === 'waiting' ? undefined : dismiss}
-        />
-      ))}
-      {data.rows.length === 0 && (
-        <p className="text-sm text-muted-foreground">
-          Nothing to shelve yet — watch something in Jellyfin or add a few titles.
-        </p>
-      )}
     </div>
   )
 }

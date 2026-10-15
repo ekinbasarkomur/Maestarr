@@ -65,6 +65,21 @@ class TraktClient(HttpService):
     async def watchlist(self, user: str) -> list[dict[str, Any]]:
         return await self.get_json(f"/users/{user}/watchlist")
 
+    async def watchlist_events(self, user: str) -> list[WatchEvent]:
+        """Titles the user wants to watch — interest, weaker than a watch."""
+        events = []
+        for row in await self.watchlist(user) or []:
+            media = row.get("movie") or row.get("show")
+            if not media:
+                continue
+            ids = media.get("ids") or {}
+            events.append(WatchEvent(
+                kind="movie" if row.get("movie") else "series", title=media.get("title") or "?",
+                year=media.get("year"), tmdb_id=ids.get("tmdb"), tvdb_id=ids.get("tvdb"), imdb_id=ids.get("imdb"),
+                watched_at=_iso(row.get("listed_at")), source="watchlist",
+            ))
+        return events
+
 
 def letterboxd_export(path: str) -> list[WatchEvent]:
     """Parse a Letterboxd data export (folder or .zip): diary/watched + ratings.

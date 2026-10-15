@@ -43,6 +43,22 @@ export function AdultSwitch({
         />
         <Badge>18+</Badge>
       </div>
+      {on && (
+        <div className="mt-4 border-t border-white/[0.06] pt-4">
+          <Toggle
+            checked={Boolean(sections.adult?.MAESTARR_HOME_ADULT_DOWNLOADS)}
+            onChange={async (v) => {
+              try {
+                onSaved((await api.saveSettings({ MAESTARR_HOME_ADULT_DOWNLOADS: v })).sections)
+              } catch (e) {
+                setError((e as Error).message)
+              }
+            }}
+            label="Show adult downloads on the home page"
+            description="Off: Whisparr downloads stay out of the home page's Downloading panel."
+          />
+        </div>
+      )}
       {error && <p className="mt-2 text-xs text-danger">{error}</p>}
     </Panel>
   )

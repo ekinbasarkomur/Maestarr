@@ -4,6 +4,7 @@ import { NavLink, useNavigate, useParams } from 'react-router'
 
 import { AdultSwitch } from '@/components/AdultSwitch'
 import { AiForm } from '@/components/AiForm'
+import { CachingSettings } from '@/components/CachingSettings'
 import { LanguagePicker } from '@/components/LanguagePicker'
 import { useStatus } from '@/hooks/useStatus'
 import { ServiceCard, ServiceForm } from '@/components/ServiceForm'
@@ -89,6 +90,14 @@ export default function SettingsPage() {
                 {tab === 'general' && (
                   <Section title="Language" subtitle="The language Maestarr answers you in.">
                     <LanguagePicker sections={sections} onSaved={setSections} />
+                  </Section>
+                )}
+                {tab === 'general' && (
+                  <Section
+                    title="Caching"
+                    subtitle="Faster pages: slow sources are read once and kept."
+                  >
+                    <CachingSettings sections={sections} onSaved={setSections} />
                   </Section>
                 )}
                 {tab === 'general' && <GeneralTab />}

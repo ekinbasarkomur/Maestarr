@@ -156,6 +156,13 @@ export interface Recommendations {
   recommendations: MediaRef[]
 }
 
+export interface CacheStatus {
+  running: boolean
+  data_refreshed_at: number | null
+  picks_refreshed_at: number | null
+  last_error: string | null
+}
+
 export type FeedbackAction = 'open' | 'search' | 'add' | 'dismiss'
 
 export interface DiscoverRow {
@@ -323,6 +330,8 @@ export const api = {
   suggest: (type: 'tag' | 'person', q: string) =>
     get<Suggestion[]>(`/api/discover/suggest?${qs({ type, q })}`),
   genres: (kind: string) => get<string[]>(`/api/discover/genres?${qs({ kind })}`),
+  cacheStatus: () => get<CacheStatus>('/api/cache'),
+  cacheRefresh: () => send<{ started: boolean }>('POST', '/api/cache/refresh'),
   taste: () => get<{ tags: string[]; genres: string[]; people: string[] }>('/api/discover/taste'),
   feedback: (body: { kind: string; tmdb_id: number; action: FeedbackAction; title?: string }) =>
     send<{ ok: boolean }>('POST', '/api/feedback', body),
