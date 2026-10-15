@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: ["**"]  # every branch, so feature work is checked before it is merged
   pull_request:
 
 permissions:
