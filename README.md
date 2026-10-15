@@ -21,7 +21,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/demo.gif" alt="Maestarr: picks as cards, a details popup with the trailer, and a judged release list" />
+  <img src="docs/demo.gif" alt="Maestarr: Picks for tonight with tag filters, shelves, a details popup, detailed search, picks as cards in the chat and a judged release list" />
 </p>
 
 Maestarr sits next to Sonarr, Radarr, Prowlarr, qBittorrent and Jellyfin and
@@ -87,17 +87,19 @@ without your approval.
 
 <p align="center"><img src="docs/screenshots/chat.png" width="720" alt="Recommendations as cards in the chat, each with a Search button" /></p>
 
-| Home | Settings |
+| Home | Discover |
 | --- | --- |
-| ![Home: downloads, library and recently added](docs/screenshots/home.png) | ![Settings with live service status](docs/screenshots/settings.png) |
+| ![Home: downloads, library and Picks for tonight, led by what is already downloaded](docs/screenshots/home.png) | ![Detailed search: a tag filter with the user's own themes as one-tap chips](docs/screenshots/discover.png) |
 | **Details** | **Release judge** |
-| ![A title's details: backdrop, trailer, ratings, tags](docs/screenshots/details.png) | ![Judged releases as a pick list with Download buttons](docs/screenshots/release-picker.png) |
+| ![A title's details: backdrop, ratings, tags and why it was picked](docs/screenshots/details.png) | ![Judged releases as a pick list with Download buttons](docs/screenshots/release-picker.png) |
 
 | Onboarding | Service setup |
 | --- | --- |
 | ![Choosing an AI provider during setup](docs/screenshots/setup-ai.png) | ![Testing Sonarr and picking defaults](docs/screenshots/setup-services.png) |
-| **Download preferences** | **On a phone** |
-| ![Download preferences](docs/screenshots/preferences.png) | <img src="docs/screenshots/mobile.png" width="260" alt="Maestarr on a phone" /> |
+| **Settings** | **Download preferences** |
+| ![Settings: reply language and caching](docs/screenshots/settings.png) | ![Download preferences](docs/screenshots/preferences.png) |
+
+<p align="center"><img src="docs/screenshots/mobile.png" width="300" alt="Maestarr on a phone: the home page" /></p>
 
 ## Supported apps
 
