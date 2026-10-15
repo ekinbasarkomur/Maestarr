@@ -39,7 +39,8 @@ change behaviour.
 ### Changed
 - **The 18+ section left onboarding**: setup no longer mentions Whisparr, StashDB or the
   switch. It lives at the bottom of Settings → Discovery and needs an age confirmation;
-  Whisparr and StashDB settings appear only once it is on.
+  Whisparr and StashDB settings appear only once it is on, and the service status list
+  leaves them out while it is off.
 - With 18+ off, adult downloads (Whisparr's qBittorrent category, plus "adult",
   "whisparr", "xxx") are hidden from the assistant — not listed, inspected or
   removed — and XXX results are dropped from indexer searches.
