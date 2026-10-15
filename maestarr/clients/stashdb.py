@@ -7,6 +7,7 @@ agent never sees these tools otherwise. Every query needs an API key
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Any, Optional
 
@@ -75,17 +76,92 @@ class StashDbClient(HttpService):
         *,
         studios: Optional[list[str]] = None,
         performers: Optional[list[str]] = None,
+        tags: Optional[list[str]] = None,
+        exclude_tags: Optional[list[str]] = None,
+        text: Optional[str] = None,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+        favorites: Optional[str] = None,
         sort: str = "DATE",
+        direction: str = "DESC",
+        page: int = 1,
         per_page: int = 20,
     ) -> list[dict[str, Any]]:
-        """Newest (or trending) scenes, optionally from given studio/performer ids."""
-        criteria: dict[str, Any] = {"sort": sort, "direction": "DESC", "page": 1, "per_page": per_page}
+        """Scenes matching the given ids and filters (studios/performers match any;
+        tags must all match). `favorites` is PERFORMER, STUDIO or ALL."""
+        criteria: dict[str, Any] = {"sort": sort, "direction": direction, "page": page, "per_page": per_page}
         if studios:
             criteria["studios"] = {"value": studios, "modifier": "INCLUDES"}
         if performers:
             criteria["performers"] = {"value": performers, "modifier": "INCLUDES"}
+        if tags:
+            criteria["tags"] = {"value": tags, "modifier": "INCLUDES_ALL"}
+        elif exclude_tags:  # one tag criterion only; with includes, excludes are filtered afterwards
+            criteria["tags"] = {"value": exclude_tags, "modifier": "EXCLUDES"}
+        if text:
+            criteria["text"] = text
+        if date_from and date_to:
+            # stash-box takes one date criterion; the upper bound is applied afterwards.
+            criteria["date"] = {"value": date_from, "modifier": "GREATER_THAN"}
+        elif date_from:
+            criteria["date"] = {"value": date_from, "modifier": "GREATER_THAN"}
+        elif date_to:
+            criteria["date"] = {"value": date_to, "modifier": "LESS_THAN"}
+        if favorites:
+            criteria["favorites"] = favorites
         data = await self.query(QUERY_SCENES, input=criteria)
         return [scene_out(s) for s in (data.get("queryScenes") or {}).get("scenes") or []]
+
+    async def favorite_performers(self, limit: int = 50) -> list[dict[str, Any]]:
+        """Performers the key's owner marked as favourites on StashDB."""
+        data = await self.query(
+            "query ($n: Int) { queryPerformers(input: {is_favorite: true, per_page: $n}) "
+            "{ performers { id name gender } } }", n=limit)
+        return (data.get("queryPerformers") or {}).get("performers") or []
+
+    async def favorite_studios(self, limit: int = 50) -> list[dict[str, Any]]:
+        data = await self.query(
+            "query ($n: Int) { queryStudios(input: {is_favorite: true, per_page: $n}) { studios { id name } } }", n=limit)
+        return (data.get("queryStudios") or {}).get("studios") or []
+
+    async def search_tags(self, term: str, limit: int = 10) -> list[dict[str, Any]]:
+        data = await self.query("query ($t: String!, $n: Int) { searchTag(term: $t, limit: $n) { id name } }", t=term, n=limit)
+        return data.get("searchTag") or []
+
+    async def search_studios(self, term: str, limit: int = 10) -> list[dict[str, Any]]:
+        data = await self.query(
+            "query ($t: String!, $n: Int) { searchStudio(term: $t, limit: $n) { id name } "
+            "queryStudios(input: {name: $t, per_page: $n}) { studios { id name } } }", t=term, n=limit)
+        seen: dict[str, dict[str, Any]] = {}
+        for st in (data.get("searchStudio") or []) + ((data.get("queryStudios") or {}).get("studios") or []):
+            seen.setdefault(st["id"], st)
+        return list(seen.values())[:limit]
+
+    async def tag_id(self, name: str) -> Optional[dict[str, Any]]:
+        data = await self.query("query ($n: String!) { findTagOrAlias(name: $n) { id name } }", n=name)
+        return data.get("findTagOrAlias")
+
+    async def tag_categories(self, names: list[str]) -> dict[str, tuple[str, str]]:
+        """(category, group) of each tag name, in one aliased request."""
+        if not names:
+            return {}
+        fields = " ".join(f"t{i}: findTagOrAlias(name: {json.dumps(n)}) {{ name category {{ name group }} }}"
+                          for i, n in enumerate(names))
+        data = await self.query(f"query {{ {fields} }}")
+        out: dict[str, tuple[str, str]] = {}
+        for n, t in zip(names, (data.get(f"t{i}") for i in range(len(names)))):
+            cat = (t or {}).get("category") or {}
+            out[n] = (cat.get("name") or "", cat.get("group") or "")
+        return out
+
+    async def scenes_by_ids(self, ids: list[str]) -> list[dict[str, Any]]:
+        """Several scenes in one aliased request."""
+        ids = [i for i in ids if _UUID.fullmatch(i)]
+        if not ids:
+            return []
+        fields = " ".join(f's{i}: findScene(id: "{sid}") {{ {SCENE_FIELDS} }}' for i, sid in enumerate(ids))
+        data = await self.query(f"query {{ {fields} }}")
+        return [scene_out(sc) for sc in data.values() if sc]
 
     async def scene(self, scene_id: str) -> Optional[dict[str, Any]]:
         data = await self.query(FIND_SCENE, id=scene_id)

@@ -9,11 +9,11 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 
+import { AdultDiscover } from '@/components/AdultDiscover'
 import { ChipInput } from '@/components/ChipInput'
-import { PickCardView } from '@/components/chat/PickCarousel'
 import { MediaTile } from '@/components/MediaCard'
 import { Button, Input, Select } from '@/components/ui/primitives'
-import { type AdultPicks, api, type MediaRef, type SearchParams } from '@/lib/api'
+import { api, type MediaRef, type SearchParams } from '@/lib/api'
 import { type PickCard, searchPrompt } from '@/lib/picks'
 import { sendFeedback, targetFrom, useDetails } from '@/lib/useDetails'
 import { cn } from '@/lib/utils'
@@ -72,7 +72,7 @@ export default function DiscoverPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Discover</h1>
           <p className="text-sm text-muted-foreground">
             {tab === 'adult'
-              ? 'New scenes from the studios and performers in your Whisparr library.'
+              ? 'Shelves from your Whisparr library and StashDB favourites. Search to see results; clear it to get the shelves back.'
               : 'Search by anything: text, tags, people, genres, years, rating, language. Your picks live on the home page.'}
           </p>
         </header>
@@ -108,8 +108,8 @@ export default function DiscoverPage() {
           />
         )}
         {tab === 'adult' && (
-          <AdultPanel
-            onSearch={(c) => ask(searchPrompt(c))}
+          <AdultDiscover
+            onGet={(c) => ask(searchPrompt(c))}
             onOpen={(c) =>
               details.open({
                 kind: 'scene',
@@ -495,104 +495,6 @@ function SearchTab({
               Nothing matches — loosen a filter.
             </p>
           )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function AdultPanel({
-  onSearch,
-  onOpen,
-}: {
-  onSearch: (c: PickCard) => void
-  onOpen: (c: PickCard) => void
-}) {
-  const [draft, setDraft] = useState('')
-  const [query, setQuery] = useState('')
-  const [result, setResult] = useState<{ key: string; data?: AdultPicks; error?: string } | null>(
-    null,
-  )
-  const loading = result?.key !== query
-
-  useEffect(() => {
-    let alive = true
-    api
-      .adult(query || undefined)
-      .then((d) => alive && setResult({ key: query, data: d }))
-      .catch((e) => alive && setResult({ key: query, error: (e as Error).message }))
-    return () => {
-      alive = false
-    }
-  }, [query])
-
-  const data = result?.data
-  return (
-    <div className="space-y-5">
-      <form
-        className="flex max-w-xl gap-2"
-        onSubmit={(e) => {
-          e.preventDefault()
-          setQuery(draft.trim())
-        }}
-      >
-        <div className="relative flex-1">
-          <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder="Search StashDB: a studio, performer or theme"
-            className="pl-9"
-          />
-        </div>
-        <Button type="submit" variant="secondary">
-          Search
-        </Button>
-        {query && (
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              setDraft('')
-              setQuery('')
-            }}
-          >
-            For you
-          </Button>
-        )}
-      </form>
-      {!query && data?.based_on.length ? (
-        <p className="text-xs text-muted-foreground">Tuned to {data.based_on.join(', ')}</p>
-      ) : null}
-      {loading && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" />
-          {query ? 'Searching StashDB…' : 'Reading your Whisparr library and StashDB…'}
-        </div>
-      )}
-      {!loading && result?.error && (
-        <div className="glass rounded-2xl p-6 text-sm text-muted-foreground">{result.error}</div>
-      )}
-      {!loading && data && data.scenes.length === 0 && (
-        <div className="glass rounded-2xl p-6 text-sm text-muted-foreground">Nothing found.</div>
-      )}
-      {data && !result?.error && (
-        <div
-          className={cn(
-            'grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4',
-            loading && 'opacity-60',
-          )}
-        >
-          {data.scenes.map((c) => (
-            <PickCardView
-              key={c.stash_id ?? c.title}
-              card={{ ...c, why: c.why?.[0] ?? '' } as PickCard}
-              onSearch={onSearch}
-              onOpen={onOpen}
-              className="w-full"
-              label="Get"
-            />
-          ))}
         </div>
       )}
     </div>

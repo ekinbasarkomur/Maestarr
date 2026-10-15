@@ -204,7 +204,7 @@ export interface SearchResults {
 }
 
 export interface Suggestion {
-  id: number
+  id: number | string
   name: string
   department?: string | null
   known_for?: string[]
@@ -258,6 +258,44 @@ export interface TitleDetails {
   tmdb_id?: number | null
   tvdb_id?: number | null
   stash_id?: string | null
+}
+
+export interface AdultRow {
+  id: string
+  title: string
+  subtitle?: string | null
+  items: AdultScene[]
+}
+
+/** A scene as the adult endpoints return it (`why` is a list here). */
+export type AdultScene = Omit<import('./picks').PickCard, 'why'> & {
+  why: string[]
+  tags?: string[]
+}
+
+export interface AdultRows {
+  rows: AdultRow[]
+  based_on: string[]
+  tags: string[]
+}
+
+export interface AdultSearchParams {
+  text?: string
+  tags?: string[]
+  exclude_tags?: string[]
+  performers?: string[]
+  studios?: string[]
+  date_from?: string
+  date_to?: string
+  min_minutes?: number
+  max_minutes?: number
+  sort?: string
+}
+
+export interface AdultSearchResult {
+  scenes: AdultScene[]
+  applied: Record<string, string[]>
+  not_found: string[]
 }
 
 export interface AdultPicks {
@@ -337,6 +375,14 @@ export const api = {
   cacheStatus: () => get<CacheStatus>('/api/cache'),
   cacheRefresh: () => send<{ started: boolean }>('POST', '/api/cache/refresh'),
   taste: () => get<{ tags: string[]; genres: string[]; people: string[] }>('/api/discover/taste'),
+  adultRows: (refresh = false) =>
+    get<AdultRows>(`/api/adult/rows${refresh ? '?refresh=true' : ''}`),
+  adultSearch: (params: AdultSearchParams) =>
+    send<AdultSearchResult>('POST', '/api/adult/search', params),
+  adultSuggest: (what: 'tag' | 'performer' | 'studio', q: string) =>
+    get<Suggestion[]>(`/api/adult/suggest?${qs({ what, q })}`),
+  adultFeedback: (stash_id: string, action: FeedbackAction) =>
+    send<{ ok: boolean }>('POST', '/api/adult/feedback', { stash_id, action }),
   feedback: (body: { kind: string; tmdb_id: number; action: FeedbackAction; title?: string }) =>
     send<{ ok: boolean }>('POST', '/api/feedback', body),
   details: (params: DetailsQuery) =>

@@ -82,15 +82,15 @@ export function Shelf({
   )
 }
 
-export function ShelfSkeleton({ bare = false }: { bare?: boolean }) {
+export function ShelfSkeleton({ bare = false, wide = false }: { bare?: boolean; wide?: boolean }) {
   return (
     <div className="space-y-3">
       {!bare && <div className="shimmer h-5 w-48 rounded" />}
       <div className="flex gap-4 overflow-hidden">
         {Array.from({ length: 8 }, (_, i) => (
-          <div key={i} className="w-36 shrink-0 space-y-2 sm:w-40">
+          <div key={i} className={cn('shrink-0 space-y-2', wide ? 'w-[260px]' : 'w-36 sm:w-40')}>
             <div
-              className="shimmer aspect-[2/3] rounded-xl"
+              className={cn('shimmer rounded-xl', wide ? 'aspect-video' : 'aspect-[2/3]')}
               style={{ animationDelay: `${i * 90}ms` }}
             />
             <div className="shimmer h-3 w-3/4 rounded" style={{ animationDelay: `${i * 90}ms` }} />
@@ -113,12 +113,22 @@ const STEPS = [
  * Shown while shelves are being built for the first time (or after a cache
  * refresh): the steps Maestarr goes through, over shimmering placeholders.
  */
-export function ShelvesLoading({ rows = 3 }: { rows?: number }) {
+export function ShelvesLoading({
+  rows = 3,
+  steps = STEPS,
+  wide = false,
+}: {
+  rows?: number
+  /** What Maestarr is doing, shown one after another. */
+  steps?: string[]
+  /** Landscape placeholders (scenes) instead of posters. */
+  wide?: boolean
+}) {
   const [step, setStep] = useState(0)
   useEffect(() => {
-    const t = setInterval(() => setStep((s) => (s + 1) % STEPS.length), 2600)
+    const t = setInterval(() => setStep((s) => (s + 1) % steps.length), 2600)
     return () => clearInterval(t)
-  }, [])
+  }, [steps.length])
   return (
     <div className="space-y-8" aria-busy="true" aria-live="polite">
       <div className="glass flex items-center gap-4 rounded-2xl px-5 py-4">
@@ -132,11 +142,11 @@ export function ShelvesLoading({ rows = 3 }: { rows?: number }) {
             key={step}
             className="animate-[fadein_0.4s_ease] truncate text-xs text-muted-foreground"
           >
-            {STEPS[step]}
+            {steps[step]}
           </p>
         </div>
         <div className="ml-auto hidden gap-1.5 sm:flex">
-          {STEPS.map((_, i) => (
+          {steps.map((_, i) => (
             <span
               key={i}
               className={cn(
@@ -148,7 +158,7 @@ export function ShelvesLoading({ rows = 3 }: { rows?: number }) {
         </div>
       </div>
       {Array.from({ length: rows }, (_, i) => (
-        <ShelfSkeleton key={i} />
+        <ShelfSkeleton key={i} wide={wide} />
       ))}
     </div>
   )

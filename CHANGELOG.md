@@ -24,6 +24,14 @@ change behaviour.
 - **More taste signals**: Jellyfin favourites, Seerr requests, Trakt watchlist and
   AniList favourites and plan-to-watch now shape the picks, each weighted for how much
   it says.
+- **Adult discovery** (Discover → Adult, only with 18+ on): streaming-style shelves —
+  top picks, new from your StashDB favourites, more with the performers and from the
+  studios you follow, your recurring themes, trending — built from your Whisparr
+  library, StashDB favourites and what you open or turn down (*Not for me* on every
+  card). Typing a search or setting a filter swaps the shelves for results; clearing
+  it brings them back. Filters: tags (all of), excluded tags, performers, studios,
+  release dates, length and sort, with autocomplete from StashDB. Scene taste is kept
+  apart from film taste. The agent gets the same search as `adult_discover`.
 - Settings → Discovery: *Show adult downloads on the home page* (off by default).
 
 ### Changed

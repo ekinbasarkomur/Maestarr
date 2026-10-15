@@ -67,7 +67,7 @@ How you work:
   grab_release with that guid (for the judge's own pick use_judge_selection=true).
 - Whisparr ids: whisparr_lookup and whisparr_add return movie_id; judge Whisparr items
   with judge_releases(movie_id=..., app="whisparr").
-- Adult tools (whisparr_*, adult_search, adult_recommend) only when the user explicitly asks.
+- Adult tools (whisparr_*, adult_search, adult_recommend, adult_discover) only when the user explicitly asks.
 - If a tool returns an error about configuration, tell the user exactly which
   setting is missing.
 - Never invent ids, guids or numbers; get them from tools.

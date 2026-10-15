@@ -368,3 +368,74 @@ async def put_preferences(body: dict[str, Any], _: Any = Depends(require_user)) 
     from maestarr.ops.downloads import update_preferences
 
     return update_preferences(get_services(), body)
+
+
+@router.get("/adult/rows")
+async def adult_rows(refresh: bool = False, _: Any = Depends(require_user)) -> Any:
+    from maestarr.taste import adult as adult_taste
+
+    svc = get_services()
+    try:
+        out = await adult_taste.rows(svc, refresh=refresh)
+    except ServiceError as exc:
+        return JSONResponse({"detail": str(exc).split(": ", 1)[-1]}, status_code=503)
+    await adult_taste.record_impressions(svc, [i for row in out["rows"] for i in row["items"][:8]])
+    return out
+
+
+class AdultSearch(BaseModel):
+    text: Optional[str] = None
+    tags: list[str] = []
+    exclude_tags: list[str] = []
+    performers: list[str] = []
+    studios: list[str] = []
+    date_from: Optional[str] = None
+    date_to: Optional[str] = None
+    min_minutes: Optional[int] = None
+    max_minutes: Optional[int] = None
+    sort: str = "relevance"
+    limit: int = 30
+
+
+@router.post("/adult/search")
+async def adult_search(body: AdultSearch, _: Any = Depends(require_user)) -> Any:
+    from maestarr.taste import adult as adult_taste
+
+    try:
+        return await adult_taste.search(
+            get_services(), text=(body.text or "").strip() or None, tags=body.tags, exclude_tags=body.exclude_tags,
+            performers=body.performers, studios=body.studios, date_from=body.date_from or None,
+            date_to=body.date_to or None, min_minutes=body.min_minutes, max_minutes=body.max_minutes,
+            sort=body.sort, limit=max(1, min(body.limit, 60)),
+        )
+    except ServiceError as exc:
+        return JSONResponse({"detail": str(exc).split(": ", 1)[-1]}, status_code=503)
+
+
+@router.get("/adult/suggest")
+async def adult_suggest(what: str, q: str, _: Any = Depends(require_user)) -> Any:
+    from maestarr.taste import adult as adult_taste
+
+    if len(q.strip()) < 2:
+        return []
+    try:
+        return await adult_taste.suggest(get_services(), what, q.strip())
+    except ServiceError as exc:
+        return JSONResponse({"detail": str(exc).split(": ", 1)[-1]}, status_code=503)
+
+
+class AdultFeedbackBody(BaseModel):
+    stash_id: str
+    action: str  # open | search | dismiss
+
+
+@router.post("/adult/feedback")
+async def adult_feedback(body: AdultFeedbackBody, _: Any = Depends(require_user)) -> Any:
+    from maestarr.taste import adult as adult_taste
+
+    if body.action not in ("open", "search", "add", "dismiss"):
+        return JSONResponse({"detail": "unknown action"}, status_code=400)
+    try:
+        return await adult_taste.react(get_services(), body.stash_id, body.action)
+    except ServiceError as exc:
+        return JSONResponse({"detail": str(exc).split(": ", 1)[-1]}, status_code=503)

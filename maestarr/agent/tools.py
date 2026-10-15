@@ -705,14 +705,63 @@ async def find_tags(ctx: Ctx, word: str) -> list[dict[str, Any]]:
 
 @tool("stashdb")
 async def adult_recommend(ctx: Ctx, query: Optional[str] = None, limit: int = 12) -> dict[str, Any]:
-    """Adult scene picks: new scenes from the studios and performers in the user's Whisparr
-    library (or StashDB matches for `query`). Only when the user asks for adult content.
+    """Adult scene picks fitted to the user's taste (Whisparr library, StashDB favourite
+    performers and studios, past reactions), or StashDB matches for `query`. Only when
+    the user asks for adult content.
 
     Args:
-        query: Optional search text (studio, performer, theme). Leave empty for library-based picks.
+        query: Optional search text (studio, performer, theme). Leave empty for personal picks.
         limit: How many scenes.
     """
-    return await discovery.adult_picks(ctx.deps, query, limit)
+    if query:
+        return await discovery.adult_picks(ctx.deps, query, limit)
+    from maestarr.taste import adult
+
+    shelves = (await adult.rows(ctx.deps))["rows"]
+    scenes: list[dict[str, Any]] = []
+    for item in (i for row in shelves for i in row["items"][:4]):
+        if item["stash_id"] not in {s["stash_id"] for s in scenes}:
+            scenes.append(item)
+    scenes = scenes[:limit]
+    return {"based_on": [r["title"] for r in shelves], "scenes": scenes}
+
+
+@tool("stashdb")
+async def adult_discover(
+    ctx: Ctx,
+    text: Optional[str] = None,
+    tags: Optional[list[str]] = None,
+    exclude_tags: Optional[list[str]] = None,
+    performers: Optional[list[str]] = None,
+    studios: Optional[list[str]] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    min_minutes: Optional[int] = None,
+    max_minutes: Optional[int] = None,
+    sort: Literal["relevance", "newest", "oldest", "trending", "longest", "shortest"] = "relevance",
+    limit: int = 20,
+) -> dict[str, Any]:
+    """Detailed adult scene search on StashDB: any mix of text, tags, performers, studios,
+    release dates and length. Only when the user asks for adult content.
+
+    Args:
+        text: Free text (title or words in it).
+        tags: StashDB tags that must all be on the scene.
+        exclude_tags: Tags the scene must not have.
+        performers: Performer names (any of them).
+        studios: Studio names (any of them).
+        date_from: Released on or after, YYYY-MM-DD.
+        date_to: Released on or before, YYYY-MM-DD.
+        min_minutes: Shortest length in minutes.
+        max_minutes: Longest length in minutes.
+        sort: relevance (popularity), newest, oldest, trending, longest or shortest.
+        limit: How many scenes (max 60).
+    """
+    from maestarr.taste import adult
+
+    return await adult.search(ctx.deps, text=text, tags=tags, exclude_tags=exclude_tags, performers=performers,
+                              studios=studios, date_from=date_from, date_to=date_to, min_minutes=min_minutes,
+                              max_minutes=max_minutes, sort=sort, limit=max(1, min(limit, 60)))
 
 
 @tool()
@@ -721,7 +770,7 @@ async def show_recommendations(ctx: Ctx, picks: list[picks_ops.Pick]) -> dict[st
     description, your reason, and a Search button under each.
 
     Call it ONCE with your final picks whenever you recommend titles or scenes (after
-    choosing them with recommend, search_titles, adult_recommend or adult_search). Give
+    choosing them with recommend, search_titles, adult_recommend, adult_discover or adult_search). Give
     real ids from those tools (tmdb_id / tvdb_id / stash_id). Afterwards reply with one or
     two sentences; do not repeat each title's details, the cards show them.
 
