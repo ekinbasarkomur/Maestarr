@@ -235,7 +235,7 @@ def scene_out(s: dict[str, Any]) -> dict[str, Any]:
         "studio_id": studio.get("id"),
         "performers": [p["performer"]["name"] for p in s.get("performers") or []],
         "performer_ids": [p["performer"]["id"] for p in s.get("performers") or []],
-        "tags": [t["name"] for t in s.get("tags") or []][:12],
+        "tags": [t["name"] for t in s.get("tags") or []],  # all of them: search filters on them
         "overview": (s.get("details") or "")[:400] or None,
         "image": f"{landscape[0]['url']}?size={IMAGE_SIZE}" if landscape else None,
     }
