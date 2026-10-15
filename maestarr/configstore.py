@@ -63,12 +63,14 @@ class ConfigStore:
         self.path = path
         path.parent.mkdir(parents=True, exist_ok=True)
         with self._conn() as db:
+            # Write-ahead logging: readers (session checks) never wait for a writer.
+            db.execute("PRAGMA journal_mode=WAL")
             db.executescript(SCHEMA)
 
     @contextmanager
     def _conn(self) -> Iterator[sqlite3.Connection]:
         with _lock:
-            db = sqlite3.connect(self.path, timeout=10)
+            db = sqlite3.connect(self.path, timeout=30)
             db.execute("PRAGMA foreign_keys = ON")
             try:
                 yield db

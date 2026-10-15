@@ -38,7 +38,7 @@ class Store:
         self._ready = False
 
     async def _db(self) -> aiosqlite.Connection:
-        db = await aiosqlite.connect(self.path)
+        db = await aiosqlite.connect(self.path, timeout=30)
         db.row_factory = aiosqlite.Row
         if not self._ready:
             await db.executescript(SCHEMA)

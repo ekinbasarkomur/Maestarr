@@ -92,7 +92,7 @@ class AdultFeedbackStore:
         self._ready = False
 
     async def _db(self) -> aiosqlite.Connection:
-        db = await aiosqlite.connect(self.path)
+        db = await aiosqlite.connect(self.path, timeout=30)
         db.row_factory = aiosqlite.Row
         if not self._ready:
             await db.executescript(SCHEMA)
@@ -102,25 +102,29 @@ class AdultFeedbackStore:
 
     async def shown(self, items: Iterable[tuple[str, str]], now: Optional[float] = None) -> None:
         now = now or time.time()
+        items = list(items)
         db = await self._db()
         try:
+            # Read first, then one short write (see FeedbackStore.shown).
+            async with db.execute("SELECT scene_id, shown, last_shown, last_engaged FROM adult_impressions") as cur:
+                known = {r["scene_id"]: r for r in await cur.fetchall()}
+            writes = []
             for scene_id, title in items:
-                async with db.execute(
-                    "SELECT shown, last_shown, last_engaged FROM adult_impressions WHERE scene_id=?", (scene_id,)
-                ) as cur:
-                    row = await cur.fetchone()
+                row = known.get(scene_id)
                 if row and row["last_shown"] and now - row["last_shown"] < STICKY:
                     continue
                 shown = (row["shown"] if row else 0) + 1
                 engaged_since = bool(row and row["last_engaged"] and row["last_engaged"] >= (row["last_shown"] or 0))
                 due = now + (2 * DAY if engaged_since else next_interval_days(shown) * DAY)
-                await db.execute(
+                writes.append((scene_id, title, shown, now, due))
+            if writes:
+                await db.executemany(
                     """INSERT INTO adult_impressions (scene_id, title, shown, last_shown, next_due) VALUES (?,?,?,?,?)
                        ON CONFLICT(scene_id) DO UPDATE SET shown=excluded.shown, last_shown=excluded.last_shown,
                          next_due=MAX(adult_impressions.next_due, excluded.next_due), title=excluded.title""",
-                    (scene_id, title, shown, now, due),
+                    writes,
                 )
-            await db.commit()
+                await db.commit()
         finally:
             await db.close()
 

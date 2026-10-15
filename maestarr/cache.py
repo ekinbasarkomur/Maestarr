@@ -44,7 +44,7 @@ class CacheStore:
         self._ready = False
 
     async def _db(self) -> aiosqlite.Connection:
-        db = await aiosqlite.connect(self.path)
+        db = await aiosqlite.connect(self.path, timeout=30)
         if not self._ready:
             await db.executescript(SCHEMA)
             await db.commit()

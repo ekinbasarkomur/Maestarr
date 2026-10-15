@@ -43,6 +43,11 @@ change behaviour.
 ### Changed
 - A cancelled turn also lists the steps that were still running when it was stopped.
 
+### Fixed
+- "Database is locked" errors (failed logins, chats that would not delete) while
+  suggestions were being recorded: the database now uses write-ahead logging and
+  shown suggestions are saved in one short write.
+
 ## [0.5.0] - 2026-10-15
 
 ### Added
