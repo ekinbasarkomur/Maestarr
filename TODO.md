@@ -168,3 +168,51 @@ without an AI provider get picks that improve with use.
 - Works per user (see #1) and for adult scenes separately (StashDB tags/performers/studios
   as features), never mixing the two.
 - No data leaves the server.
+
+---
+
+## 4. Jellyfin plugin
+
+Bring Maestarr into the place people actually watch: Jellyfin's own web and TV
+apps. (Research from 2026-10-14: Jellyfin server plugins are official .NET
+plugins; extra pages and UI injection go through the community plugins
+*Plugin Pages*, *File Transformation* and *Home Screen Sections*, which this
+stack already runs.)
+
+### Features
+
+- **Maestarr shelves on Jellyfin's home screen** — "Picks for tonight", "Because you
+  watched …", "Waiting in your library" as sections through the *Home Screen Sections*
+  plugin. Titles already in the library play directly; others show "Get it" (which asks
+  Maestarr to add and judge, with the usual approval).
+- **"Ask Maestarr" page** — the chat inside Jellyfin's web UI via *Plugin Pages*, signed in
+  as the matching Maestarr user, so no separate login.
+- **Buttons on item pages** (via *File Transformation*): on a movie/series/episode —
+  *Find a better release*, *Subtitles?*, *More like this*; on a missing episode —
+  *Find and download*; on a watched item — *Delete and free space* (approval required).
+- **Instant watch signals** — the plugin tells Maestarr when something is played,
+  finished, rated or favourited (Jellyfin's session/user-data events), so the taste profile
+  updates right away instead of polling Jellyfin's slow history query.
+- **"Maestarr picks" collections** — optional real Jellyfin collections/playlists that the
+  plugin keeps in sync with the user's shelves (this replaces the roadmap item for
+  Jellyfin; Emby/Plex stay separate).
+- **User mapping** — each Jellyfin user maps to a Maestarr user (see #1); their history,
+  picks and permissions follow them across Jellyfin clients.
+
+### Shape
+
+- A C# plugin (`Jellyfin.Plugin.Maestarr`) targeting the Jellyfin ABI of each supported
+  release (12.x now; plugins are built per Jellyfin version, so CI builds one per target).
+- Configuration page in Jellyfin's dashboard: Maestarr URL + API token (scoped, see #2),
+  which features to turn on, per-user enablement.
+- Talks to Maestarr only over its HTTP API/MCP; Maestarr remains the brain, the plugin
+  is UI and events.
+- Distributed through a plugin repository manifest (a JSON URL users add in
+  Dashboard → Plugins → Repositories), published from GitHub releases.
+
+### Open questions
+
+- TV clients (Android TV, webOS, Swiftfin) do not run injected web UI: shelves via Home
+  Screen Sections and collections reach them, buttons and chat do not. Good enough?
+- Hard dependency on the three community plugins, or degrade gracefully when one is
+  missing (e.g. collections only)?
