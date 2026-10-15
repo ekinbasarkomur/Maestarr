@@ -7,6 +7,9 @@ change behaviour.
 
 ## [Unreleased]
 
+### Changed
+- A cancelled turn also lists the steps that were still running when it was stopped.
+
 ## [0.5.0] - 2026-10-15
 
 ### Added

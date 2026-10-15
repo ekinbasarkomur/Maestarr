@@ -86,6 +86,7 @@ async def chat(request: Request, _: Any = Depends(require_user)) -> Response:
             async for chunk in inner:
                 if recorder is not None:
                     recorder.partial += text_deltas(chunk)
+                    recorder.running += tools_started(chunk)
                 yield chunk
         finally:
             if recorder is not None and not finished:
@@ -93,6 +94,27 @@ async def chat(request: Request, _: Any = Depends(require_user)) -> Response:
 
     response.body_iterator = guarded()
     return response
+
+
+def tools_started(chunk: Any) -> list[str]:
+    r"""Names of tools whose call started inside one chunk of the UI stream.
+
+    >>> tools_started('data: {"type":"tool-input-start","toolCallId":"a","toolName":"disk_usage"}\n\n')
+    ['disk_usage']
+    """
+    raw = chunk.decode() if isinstance(chunk, (bytes, bytearray)) else str(chunk)
+    if "tool-input-start" not in raw:
+        return []
+    names = []
+    for line in raw.splitlines():
+        if line.startswith("data: ") and "tool-input-start" in line:
+            try:
+                event = json.loads(line[6:])
+            except ValueError:
+                continue
+            if event.get("type") == "tool-input-start" and event.get("toolName"):
+                names.append(str(event["toolName"]))
+    return names
 
 
 def text_deltas(chunk: Any) -> str:

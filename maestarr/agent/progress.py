@@ -27,11 +27,13 @@ class TurnRecorder:
         self.cid = cid
         self.latest: list[ModelMessage] = list(history)
         self.partial = ""  # text streamed since the last model request
+        self.running: list[str] = []  # tools called since the last model request
         self._saving: Optional[asyncio.Task[None]] = None
 
     def snapshot(self, messages: list[ModelMessage]) -> None:
         self.latest = list(messages)
         self.partial = ""
+        self.running = []
         self._saving = asyncio.ensure_future(self._save(self.latest))
 
     async def _save(self, messages: list[ModelMessage]) -> None:
@@ -44,16 +46,17 @@ class TurnRecorder:
         """Store the last state with whatever was being written and the marker."""
         if self._saving and not self._saving.done():
             await asyncio.shield(self._saving)
-        await self.store.save_messages(self.cid, mark_cancelled(self.latest, self.partial))
+        await self.store.save_messages(self.cid, mark_cancelled(self.latest, self.partial, self.running))
 
 
-def mark_cancelled(history: list[ModelMessage], partial: str = "") -> list[ModelMessage]:
-    """History plus an assistant reply holding the half-written text and the marker.
+def mark_cancelled(history: list[ModelMessage], partial: str = "", running: Optional[list[str]] = None) -> list[ModelMessage]:
+    """History plus an assistant reply holding the half-written text, the steps that
+    were still running, and the marker.
 
     >>> from pydantic_ai.messages import ModelRequest, UserPromptPart
-    >>> out = mark_cancelled([ModelRequest(parts=[UserPromptPart(content="hi")])], "Let me che")
+    >>> out = mark_cancelled([ModelRequest(parts=[UserPromptPart(content="hi")])], "Let me che", ["disk_usage"])
     >>> [p.content for p in out[-1].parts]
-    ['Let me che', '⏹ Cancelled']
+    ['Let me che', '_Stopped while running: disk usage_', '⏹ Cancelled']
     >>> len(mark_cancelled(out)) == len(out)  # never marked twice
     True
     """
@@ -61,6 +64,9 @@ def mark_cancelled(history: list[ModelMessage], partial: str = "") -> list[Model
     if isinstance(last, ModelResponse) and any(isinstance(p, TextPart) and p.content == CANCELLED for p in last.parts):
         return history
     parts: list[Any] = [TextPart(content=partial)] if partial.strip() else []
+    if running:
+        names = ", ".join(dict.fromkeys(r.replace("_", " ") for r in running))
+        parts.append(TextPart(content=f"_Stopped while running: {names}_"))
     return [*history, ModelResponse(parts=[*parts, TextPart(content=CANCELLED)])]
 
 
