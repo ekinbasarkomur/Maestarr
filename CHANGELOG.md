@@ -28,21 +28,12 @@ change behaviour.
   and `recommend` accepts tags.
 
 
-## [0.4.3] - 2026-10-15
-
-### Added
-- The assistant can turn monitoring on or off without deleting anything — for a
-  series, one season, some episodes, a movie or a Whisparr scene — and remove an
-  item from its app (files kept unless you ask, optional import exclusion). Both
-  ask for approval first.
-
-
-## [0.4.2] - 2026-10-15
-
-### Fixed
-- The chat no longer scrolls sideways: only recommendation rows, wide tables and
+### Also in this release
+- The assistant can turn monitoring on or off without deleting anything (series,
+  season, episodes, movie, Whisparr scene) and remove an item from its app, files
+  kept unless asked; both need approval.
+- The chat no longer scrolls sideways; only recommendation rows, wide tables and
   code blocks scroll horizontally.
-
 
 ## [0.4.1] - 2026-10-15
 
@@ -129,9 +120,7 @@ The first public release.
 - A chat that contained a "thinking" reply no longer fails on the next message.
 
 [Unreleased]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.5.0...HEAD
-[0.5.0]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.4.3...v0.5.0
-[0.4.3]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.4.2...v0.4.3
-[0.4.2]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.4.1...v0.4.2
+[0.5.0]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ekinbasarkomur/Maestarr/compare/v0.2.2...v0.3.0
