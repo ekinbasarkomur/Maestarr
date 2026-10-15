@@ -199,6 +199,35 @@ stack already runs.)
 - **User mapping** — each Jellyfin user maps to a Maestarr user (see #1); their history,
   picks and permissions follow them across Jellyfin clients.
 
+### Ideas from Jellyfin Helper (a chosen subset, plus our own)
+
+[Jellyfin Helper](https://github.com/JellyPlugins/jellyfin-helper) (GPL-3.0, Jellyfin 12.2+)
+is a multi-tab admin plugin with cleanup, library statistics and recommendations. Take
+**some** of its features, not all, and add our own. Candidates (to pick from when the
+spec is written):
+
+- **Library analysis** — codec / resolution / HDR / container breakdowns; a library
+  explorer combining resolution, codec, bitrate, language and watched-by filters down to
+  the files; per-library disk usage; a growth timeline; largest folders and recent changes.
+  Maestarr could answer these in chat too ("which 4K titles have no Turkish subtitles?").
+- **Health checks** — videos missing subtitles, artwork or NFO; orphaned metadata folders.
+- **Safe cleanup** — dry run by default and a timestamped trash with auto-purge instead
+  of deleting: orphaned trickplay folders, empty folders, orphaned subtitles, broken
+  `.strm`/symlinks, Seerr requests whose media is gone.
+- **Arr comparison** — items only in Radarr/Sonarr, only in Jellyfin, or in both.
+- **User activity** — per-user / per-item plays, completion, favourites, genre mix
+  (feeds the taste profile and #1's per-user picks).
+- **Discovery surfaces** — sync picks to native Jellyfin playlists; a Discover custom tab
+  that excludes everything already in the library or in Radarr/Sonarr; parental limits
+  for restricted (child) profiles.
+- **Operations** — backup/restore of the plugin state with secrets encrypted at rest, a
+  plugin-only log viewer, an unsaved-changes guard on settings.
+
+Not wanted from it: a second, separate recommender (Maestarr's engine stays the one
+brain, see #3) and its own Trakt plumbing (Maestarr already connects to Trakt).
+
+Our own additions: *to be added by the user.*
+
 ### Shape
 
 - A C# plugin (`Jellyfin.Plugin.Maestarr`) targeting the Jellyfin ABI of each supported
